@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
@@ -29,7 +29,8 @@ class PartyBase(BaseModel):
     profession: Optional[str] = Field(None, max_length=100)
 
     # Campos UAFE
-    actividad_economica: Optional[str] = Field(None, pattern="^(independiente|empleado|jubilado|quehaceres_domesticos|cuidador_hogar|estudiante|ninguna)$")
+    actividad_economica: Optional[str] = Field(None, pattern="^(independiente|empleado|jubilado|quehaceres_domesticos|cuidador_hogar|estudiante|ninguna|funcionario_publico|empresario|comerciante|emprendedor|creador_contenido|influencer|profesional_autonomo|constructor|contratista|otro)$")
+    actividad_economica_otra: Optional[str] = Field(None, max_length=200)
     empresa_trabajo: Optional[str] = Field(None, max_length=200)
     ingreso_mensual: Optional[Decimal] = None
     rol_tramite: Optional[str] = Field(None, pattern="^(vendedor|adquirente)$")
@@ -55,6 +56,14 @@ class PartyBase(BaseModel):
 
     # Calidad de participación
     calidad_participacion: Optional[str] = Field(None, pattern="^(propios_derechos|representando|propios_y_representando)$")
+
+    @model_validator(mode="after")
+    def validar_actividad_otra(self):
+        if self.actividad_economica == "otro" and not (self.actividad_economica_otra or "").strip():
+            raise ValueError("Especifique la actividad económica")
+        if self.actividad_economica != "otro":
+            self.actividad_economica_otra = None
+        return self
 
     @field_validator('document_number')
     @classmethod
@@ -116,6 +125,7 @@ class PartyUpdate(BaseModel):
     occupation: Optional[str] = None
     profession: Optional[str] = None
     actividad_economica: Optional[str] = None
+    actividad_economica_otra: Optional[str] = None
     empresa_trabajo: Optional[str] = None
     ingreso_mensual: Optional[Decimal] = None
     es_pep: Optional[bool] = None

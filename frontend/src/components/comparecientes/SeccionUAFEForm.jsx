@@ -1,4 +1,5 @@
 import { FormField, Card } from "../shared";
+import { ACTIVIDADES_ECONOMICAS } from "../../utils/actividadesEconomicas";
 
 const TIPOS_INMUEBLE = {
   casa: "Casa",
@@ -7,6 +8,7 @@ const TIPOS_INMUEBLE = {
   departamento: "Departamento",
   suite: "Suite",
   oficina: "Oficina",
+  otro: "Otro",
 };
 
 /** "¿Ya no ejerce el cargo?" + fecha de finalización */
@@ -60,6 +62,14 @@ export const ResumenPatrimonio = ({ patrimonio, nota = true }) => {
       ? [{ marca: p.vehiculos }]
       : [];
 
+  // Total informativo (inmuebles + vehículos + acciones)
+  const suma = (lista, campo) =>
+    (lista || []).reduce((t, f) => t + (parseFloat(f?.[campo]) || 0), 0);
+  const total =
+    (p.no_posee_inmuebles ? 0 : suma(inmuebles, "valor")) +
+    (p.no_posee_vehiculos ? 0 : suma(vehiculos, "valor")) +
+    (p.no_posee_acciones ? 0 : suma(p.acciones, "monto"));
+
   const titulo = (texto) => (
     <p className="font-medium text-gray-700 mt-2">{texto}</p>
   );
@@ -77,7 +87,9 @@ export const ResumenPatrimonio = ({ patrimonio, nota = true }) => {
         <ul className="list-disc pl-5 text-gray-800">
           {inmuebles.map((i, idx) => (
             <li key={idx}>
-              {TIPOS_INMUEBLE[i.tipo] || i.tipo}
+              {i.tipo === "otro" && i.especificar
+                ? `Otro (${i.especificar})`
+                : TIPOS_INMUEBLE[i.tipo] || i.tipo}
               {i.ciudad && ` en ${i.ciudad}`}
               {i.valor !== undefined &&
                 i.valor !== "" &&
@@ -123,6 +135,28 @@ export const ResumenPatrimonio = ({ patrimonio, nota = true }) => {
         {p.no_posee_inversiones || !p.inversiones ? "No posee" : p.inversiones}
       </p>
 
+      {titulo("Acciones, participaciones o capital en empresas")}
+      {p.no_posee_acciones || !(p.acciones || []).length ? (
+        <p className="text-gray-600">No posee</p>
+      ) : (
+        <ul className="list-disc pl-5 text-gray-800">
+          {p.acciones.map((a, idx) => (
+            <li key={idx}>
+              {a.entidad}
+              {a.monto !== undefined &&
+                a.monto !== "" &&
+                ` — ${formatoValor(a.monto)}`}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {total > 0 && (
+        <p className="mt-3 pt-2 border-t border-gray-200 font-semibold text-gray-900">
+          Total de bienes declarados: {formatoValor(total)}
+        </p>
+      )}
+
       {nota && (
         <p className="text-xs text-gray-500 pt-2">
           Se edita desde el formulario de registro del cliente.
@@ -159,13 +193,11 @@ const SeccionUAFEForm = ({
             className="input-field"
           >
             <option value="">Seleccione</option>
-            <option value="independiente">Independiente</option>
-            <option value="empleado">Empleado</option>
-            <option value="jubilado">Jubilado</option>
-            <option value="quehaceres_domesticos">Quehaceres Domésticos</option>
-            <option value="cuidador_hogar">Cuidador del Hogar</option>
-            <option value="estudiante">Estudiante</option>
-            <option value="ninguna">Ninguna</option>
+            {ACTIVIDADES_ECONOMICAS.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
           </select>
         </FormField>
 
@@ -180,6 +212,19 @@ const SeccionUAFEForm = ({
             placeholder="Ej: 1500"
           />
         </FormField>
+
+        {actividadEconomica === "otro" && (
+          <FormField label="Especifique la actividad" className="col-span-2">
+            <input
+              type="text"
+              value={get("actividadEconomicaOtra")}
+              onChange={(e) => set("actividadEconomicaOtra", e.target.value)}
+              className="input-field"
+              placeholder="Ej: Agricultor"
+              maxLength={200}
+            />
+          </FormField>
+        )}
 
         {(actividadEconomica === "empleado" ||
           actividadEconomica === "independiente") && (

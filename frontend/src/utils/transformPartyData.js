@@ -75,6 +75,9 @@ export const transformToCamelCase = (data) => {
       anexoSociosNombre: data.anexo_socios_nombre || "",
       // Información financiera / UAFE del representante legal
       repActividadEconomica: data.rep_actividad_economica || "",
+      repActividadEconomicaOtra: data.rep_actividad_economica_otra || "",
+      sociosModalidad: data.socios_modalidad || "",
+      autorizaConsultaSupercias: data.autoriza_consulta_supercias === true,
       repEmpresaTrabajo: data.rep_empresa_trabajo || "",
       repIngresoMensual: data.rep_ingreso_mensual ?? "",
       repRolTramite: data.rep_rol_tramite || "",
@@ -124,6 +127,7 @@ export const transformToCamelCase = (data) => {
     conyugueComparece: data.conyugue_comparece !== false,
     razonExclusionConyugue: data.razon_exclusion_conyugue || "",
     actividadEconomica: data.actividad_economica || "",
+    actividadEconomicaOtra: data.actividad_economica_otra || "",
     empresaTrabajo: data.empresa_trabajo || "",
     ingresoMensual: data.ingreso_mensual ?? "",
     origenFondos: data.origen_fondos || "",

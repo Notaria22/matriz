@@ -1,17 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, FormField } from "../shared";
 import { useAuth } from "../../context/AuthContext";
+import { apiFetch } from "../../config/api";
 
-const NOTARIOS = {
-  "alex-mejia": {
-    nombre: "ALEX DAVID MEJÍA VITERI",
-    titulo: "Notario Público Vigésimo Segundo del Cantón Quito",
-  },
-  "cristiana-casa": {
-    nombre: "CRISTINA ELIZABETH CASA LLUMIQUINGA",
-    titulo: "Notaria Pública Suplente Vigésima Segunda del Cantón Quito",
-  },
-};
+// Los notarios (titular y suplente) vienen de Gestión de Usuarios:
+// si cambia el suplente, se cambia ahí y no en el código.
 
 const TIPOS_CONTRATO = {
   compraventa: "Compraventa",
@@ -39,9 +32,35 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [notarios, setNotarios] = useState([]);
+  const [errorNotarios, setErrorNotarios] = useState("");
 
   useEffect(() => {
-    const notario = NOTARIOS[formData.notarioKey] || null;
+    let activo = true;
+    apiFetch("/api/system-users/notarios")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((lista) => {
+        if (!activo) return;
+        setNotarios(lista);
+        if (lista.length === 0)
+          setErrorNotarios(
+            "No hay notarios configurados. Un administrador debe marcar al titular y al suplente en Gestión de Usuarios.",
+          );
+      })
+      .catch(
+        () =>
+          activo && setErrorNotarios("No se pudo cargar la lista de notarios."),
+      );
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const elegido = notarios.find((n) => String(n.id) === formData.notarioKey);
+    const notario = elegido
+      ? { nombre: elegido.nombre, titulo: elegido.titulo }
+      : null;
 
     if (onChange) {
       onChange({
@@ -50,7 +69,7 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
         needsConcuerdo: showConcuerdo,
       });
     }
-  }, [formData, showConcuerdo, onChange]);
+  }, [formData, showConcuerdo, onChange, notarios]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -82,7 +101,11 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
     <Card title="Datos Administrativos">
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Notario" required error={errors.notarioKey}>
+          <FormField
+            label="Notario"
+            required
+            error={errors.notarioKey || errorNotarios}
+          >
             <select
               name="notarioKey"
               value={formData.notarioKey}
@@ -90,10 +113,11 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
               className="input-field"
             >
               <option value="">Seleccione un notario</option>
-              <option value="alex-mejia">ALEX DAVID MEJÍA VITERI</option>
-              <option value="cristiana-casa">
-                CRISTINA ELIZABETH CASA LLUMIQUINGA
-              </option>
+              {notarios.map((n) => (
+                <option key={n.id} value={String(n.id)}>
+                  {n.nombre} ({n.cargo === "titular" ? "titular" : "suplente"})
+                </option>
+              ))}
             </select>
           </FormField>
 

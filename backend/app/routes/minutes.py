@@ -65,7 +65,8 @@ async def generate_minuta(
         )
 
 
-@router.get("/")
+@router.get("")
+@router.get("/", include_in_schema=False)
 async def list_minutes(
     db: Session = Depends(get_db),
     current_user: SystemUser = Depends(get_current_user)

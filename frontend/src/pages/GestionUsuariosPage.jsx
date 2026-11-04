@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, Button, FormField, Modal } from '../components/shared';
-import { useToast } from '../hooks/useToast';
-import { apiFetch } from '../config/api';
-import API_CONFIG from '../config/api';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect, useCallback } from "react";
+import { Card, Button, FormField, Modal } from "../components/shared";
+import { useToast } from "../hooks/useToast";
+import { apiFetch } from "../config/api";
+import API_CONFIG from "../config/api";
+import { Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
 
 const GestionUsuariosPage = () => {
   const [users, setUsers] = useState([]);
@@ -12,12 +12,14 @@ const GestionUsuariosPage = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    nombre: '',
-    username: '',
-    password: '',
-    rol: 'notaria',
-    iniciales: '',
-    activo: true
+    nombre: "",
+    username: "",
+    password: "",
+    rol: "notaria",
+    iniciales: "",
+    cargoNotarial: "",
+    genero: "",
+    activo: true,
   });
   const [errors, setErrors] = useState({});
   const toast = useToast();
@@ -26,16 +28,16 @@ const GestionUsuariosPage = () => {
     try {
       setLoading(true);
       const response = await apiFetch(API_CONFIG.ENDPOINTS.SYSTEM_USERS);
-      
+
       if (response.ok) {
         const data = await response.json();
         setUsers(data);
       } else {
-        toast.error('Error al cargar usuarios');
+        toast.error("Error al cargar usuarios");
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar usuarios');
+      console.error("Error:", error);
+      toast.error("Error al cargar usuarios");
     } finally {
       setLoading(false);
     }
@@ -51,20 +53,24 @@ const GestionUsuariosPage = () => {
       setFormData({
         nombre: user.nombre,
         username: user.username,
-        password: '',
+        password: "",
         rol: user.rol,
-        iniciales: user.iniciales || '',
-        activo: user.activo
+        iniciales: user.iniciales || "",
+        cargoNotarial: user.cargo_notarial || "",
+        genero: user.genero || "",
+        activo: user.activo,
       });
     } else {
       setEditingUser(null);
       setFormData({
-        nombre: '',
-        username: '',
-        password: '',
-        rol: 'notaria',
-        iniciales: '',
-        activo: true
+        nombre: "",
+        username: "",
+        password: "",
+        rol: "notaria",
+        iniciales: "",
+        cargoNotarial: "",
+        genero: "",
+        activo: true,
       });
     }
     setErrors({});
@@ -76,12 +82,14 @@ const GestionUsuariosPage = () => {
     setShowModal(false);
     setEditingUser(null);
     setFormData({
-      nombre: '',
-      username: '',
-      password: '',
-      rol: 'notaria',
-      iniciales: '',
-      activo: true
+      nombre: "",
+      username: "",
+      password: "",
+      rol: "notaria",
+      iniciales: "",
+      cargoNotarial: "",
+      genero: "",
+      activo: true,
     });
     setErrors({});
     setShowPassword(false);
@@ -91,21 +99,25 @@ const GestionUsuariosPage = () => {
     const newErrors = {};
 
     if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre es requerido';
+      newErrors.nombre = "El nombre es requerido";
     }
 
     if (!formData.username.trim()) {
-      newErrors.username = 'El usuario es requerido';
+      newErrors.username = "El usuario es requerido";
     } else if (formData.username.length < 3) {
-      newErrors.username = 'El usuario debe tener al menos 3 caracteres';
+      newErrors.username = "El usuario debe tener al menos 3 caracteres";
     }
 
     if (!editingUser && !formData.password) {
-      newErrors.password = 'La contraseña es requerida';
+      newErrors.password = "La contraseña es requerida";
+    }
+
+    if (formData.cargoNotarial && !formData.genero) {
+      newErrors.genero = "Indique el género del notario";
     }
 
     if (formData.password && formData.password.length < 6) {
-      newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
+      newErrors.password = "La contraseña debe tener al menos 6 caracteres";
     }
 
     setErrors(newErrors);
@@ -114,7 +126,7 @@ const GestionUsuariosPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -124,7 +136,14 @@ const GestionUsuariosPage = () => {
         nombre: formData.nombre.trim(),
         username: formData.username.trim().toLowerCase(),
         rol: formData.rol,
-        iniciales: formData.iniciales.trim() || null
+        iniciales: formData.iniciales.trim() || null,
+        // "" quita el cargo notarial al editar
+        cargo_notarial: formData.cargoNotarial || (editingUser ? "" : null),
+        genero: formData.cargoNotarial
+          ? formData.genero
+          : editingUser
+            ? ""
+            : null,
       };
 
       if (editingUser) {
@@ -136,27 +155,30 @@ const GestionUsuariosPage = () => {
         dataToSend.password = formData.password;
       }
 
-      const url = editingUser 
+      const url = editingUser
         ? `${API_CONFIG.ENDPOINTS.SYSTEM_USERS}/${editingUser.id}`
         : API_CONFIG.ENDPOINTS.SYSTEM_USERS;
 
       const response = await apiFetch(url, {
-        method: editingUser ? 'PUT' : 'POST',
-        body: JSON.stringify(dataToSend)
+        method: editingUser ? "PUT" : "POST",
+        body: JSON.stringify(dataToSend),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        toast.success(data.message || (editingUser ? 'Usuario actualizado' : 'Usuario creado'));
+        toast.success(
+          data.message ||
+            (editingUser ? "Usuario actualizado" : "Usuario creado"),
+        );
         handleCloseModal();
         fetchUsers();
       } else {
-        toast.error(data.detail || data.message || 'Error al guardar usuario');
+        toast.error(data.detail || data.message || "Error al guardar usuario");
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al guardar usuario');
+      console.error("Error:", error);
+      toast.error("Error al guardar usuario");
     }
   };
 
@@ -166,28 +188,31 @@ const GestionUsuariosPage = () => {
     }
 
     try {
-      const response = await apiFetch(`${API_CONFIG.ENDPOINTS.SYSTEM_USERS}/${id}`, {
-        method: 'DELETE'
-      });
+      const response = await apiFetch(
+        `${API_CONFIG.ENDPOINTS.SYSTEM_USERS}/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (response.ok) {
-        toast.success('Usuario eliminado exitosamente');
+        toast.success("Usuario eliminado exitosamente");
         fetchUsers();
       } else {
         const data = await response.json();
-        toast.error(data.detail || data.message || 'Error al eliminar usuario');
+        toast.error(data.detail || data.message || "Error al eliminar usuario");
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al eliminar usuario');
+      console.error("Error:", error);
+      toast.error("Error al eliminar usuario");
     }
   };
 
   const getRoleBadge = (rol) => {
     const styles = {
-      admin: 'bg-red-100 text-red-800',
-      lexdata: 'bg-purple-100 text-purple-800',
-      notaria: 'bg-blue-100 text-blue-800'
+      admin: "bg-red-100 text-red-800",
+      lexdata: "bg-purple-100 text-purple-800",
+      notaria: "bg-blue-100 text-blue-800",
     };
 
     return (
@@ -253,7 +278,10 @@ const GestionUsuariosPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                  <td
+                    colSpan="5"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
                     No hay usuarios registrados
                   </td>
                 </tr>
@@ -272,14 +300,27 @@ const GestionUsuariosPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getRoleBadge(user.rol)}
+                      {user.cargo_notarial && (
+                        <span className="ml-2 px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                          {user.cargo_notarial === "titular"
+                            ? user.genero === "femenino"
+                              ? "Notaria titular"
+                              : "Notario titular"
+                            : user.genero === "femenino"
+                              ? "Notaria suplente"
+                              : "Notario suplente"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        user.activo 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {user.activo ? 'Activo' : 'Inactivo'}
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          user.activo
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {user.activo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -310,42 +351,46 @@ const GestionUsuariosPage = () => {
       <Modal
         isOpen={showModal}
         onClose={handleCloseModal}
-        title={editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+        title={editingUser ? "Editar Usuario" : "Nuevo Usuario"}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <FormField 
-            label="Nombre Completo" 
-            required 
-            error={errors.nombre}
-          >
+          <FormField label="Nombre Completo" required error={errors.nombre}>
             <input
               type="text"
               value={formData.nombre}
-              onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, nombre: e.target.value })
+              }
               className="input-field"
               placeholder="Ej: Juan Pérez"
             />
           </FormField>
 
-          <FormField 
-            label="Usuario" 
-            required 
+          <FormField
+            label="Usuario"
+            required
             error={errors.username}
-            hint={editingUser ? "No se puede cambiar el usuario" : "Minimo 3 caracteres"}
+            hint={
+              editingUser
+                ? "No se puede cambiar el usuario"
+                : "Minimo 3 caracteres"
+            }
           >
             <input
               type="text"
               value={formData.username}
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, username: e.target.value })
+              }
               className="input-field"
               placeholder="Ej: jperez"
               disabled={!!editingUser}
             />
           </FormField>
 
-          <FormField 
-            label={editingUser ? "Nueva Contraseña (opcional)" : "Contraseña"} 
+          <FormField
+            label={editingUser ? "Nueva Contraseña (opcional)" : "Contraseña"}
             required={!editingUser}
             error={errors.password}
             hint="Mínimo 6 caracteres"
@@ -354,16 +399,24 @@ const GestionUsuariosPage = () => {
               <input
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
                 className="input-field pr-10"
-                placeholder={editingUser ? "Dejar vacío para no cambiar" : "••••••"}
+                placeholder={
+                  editingUser ? "Dejar vacío para no cambiar" : "••••••"
+                }
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
               </button>
             </div>
           </FormField>
@@ -371,7 +424,9 @@ const GestionUsuariosPage = () => {
           <FormField label="Rol" required>
             <select
               value={formData.rol}
-              onChange={(e) => setFormData({...formData, rol: e.target.value})}
+              onChange={(e) =>
+                setFormData({ ...formData, rol: e.target.value })
+              }
               className="input-field"
             >
               <option value="notaria">Notaría</option>
@@ -380,19 +435,62 @@ const GestionUsuariosPage = () => {
             </select>
           </FormField>
 
-          <FormField 
-            label="Iniciales" 
+          <FormField
+            label="Iniciales"
             hint="Ej: M.V.S, A.C, E.D.H (para matrizador)"
           >
             <input
               type="text"
               value={formData.iniciales}
-              onChange={(e) => setFormData({...formData, iniciales: e.target.value.toUpperCase()})}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  iniciales: e.target.value.toUpperCase(),
+                })
+              }
               className="input-field uppercase"
               placeholder="Ej: M.V.S"
               maxLength="10"
             />
           </FormField>
+
+          <FormField
+            label="Cargo notarial"
+            hint="Solo para el notario titular y el suplente: aparecen como opción de notario al generar matrices y poderes."
+          >
+            <select
+              value={formData.cargoNotarial}
+              onChange={(e) =>
+                setFormData({ ...formData, cargoNotarial: e.target.value })
+              }
+              className="input-field"
+            >
+              <option value="">No es notario</option>
+              <option value="titular">Notario titular</option>
+              <option value="suplente">Notario suplente</option>
+            </select>
+          </FormField>
+
+          {formData.cargoNotarial && (
+            <FormField
+              label="Género"
+              required
+              error={errors.genero}
+              hint="Para los tratamientos en la escritura (Notario / Notaria)."
+            >
+              <select
+                value={formData.genero}
+                onChange={(e) =>
+                  setFormData({ ...formData, genero: e.target.value })
+                }
+                className="input-field"
+              >
+                <option value="">Seleccione</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
+            </FormField>
+          )}
 
           {editingUser && (
             <FormField label="Estado">
@@ -400,7 +498,9 @@ const GestionUsuariosPage = () => {
                 <input
                   type="checkbox"
                   checked={formData.activo}
-                  onChange={(e) => setFormData({...formData, activo: e.target.checked})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, activo: e.target.checked })
+                  }
                   className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Usuario activo</span>
@@ -416,11 +516,8 @@ const GestionUsuariosPage = () => {
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              variant="primary"
-            >
-              {editingUser ? 'Actualizar' : 'Crear Usuario'}
+            <Button type="submit" variant="primary">
+              {editingUser ? "Actualizar" : "Crear Usuario"}
             </Button>
           </div>
         </form>

@@ -24,7 +24,8 @@ def check_template_access(current_user: SystemUser, tipo_documento: str):
         )
 
 
-@router.post("/", response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", include_in_schema=False, response_model=TemplateResponse, status_code=status.HTTP_201_CREATED)
 def create_template(
     template_data: TemplateCreate,
     db: Session = Depends(get_db),
@@ -58,7 +59,8 @@ def create_template(
         )
 
 
-@router.get("/", response_model=List[TemplateSearchResult])
+@router.get("", response_model=List[TemplateSearchResult])
+@router.get("/", include_in_schema=False, response_model=List[TemplateSearchResult])
 def search_templates(
     q: Optional[str] = Query(None, description="Buscar por nombre de plantilla o vendedor"),
     tipo_documento: Optional[str] = Query(None, description="Filtrar por tipo: 'minuta' o 'matriz'"),

@@ -182,6 +182,41 @@ def _enlazar_si_nuevos(db: Session, a, a_nueva: bool, b, b_nueva: bool):
         svc.vincular_conyuges(db, a, b)
 
 
+def _socios_validos(socios) -> list:
+    return [
+        s for s in (socios or [])
+        if (s.get("nombres") or "").strip() or (s.get("numero_documento") or "").strip()
+    ]
+
+
+def _validar_socios(datos: dict, anexo_base64) -> tuple[str, list]:
+    """
+    Los socios se informan de UNA sola forma, obligatoria:
+      - empresa controlada por la Supercias: lista, anexo (nómina en PDF) o
+        autorización para consultar la web de la Superintendencia;
+      - empresa extranjera o no controlada: siempre la lista, con documento.
+    """
+    socios = _socios_validos(datos.get("socios"))
+    controlada = datos.get("controlada_supercias")
+    if controlada is None:
+        raise HTTPException(status_code=400, detail="Indique si la empresa está controlada por la Superintendencia de Compañías.")
+
+    modalidad = datos.get("socios_modalidad") if controlada else "lista"
+    if modalidad not in ("lista", "anexo", "autorizacion"):
+        raise HTTPException(status_code=400, detail="Elija cómo va a informar los socios o accionistas.")
+
+    if modalidad == "lista":
+        if not socios:
+            raise HTTPException(status_code=400, detail="Ingrese al menos un socio o accionista.")
+        if not controlada and any(not (s.get("numero_documento") or "").strip() for s in socios):
+            raise HTTPException(status_code=400, detail="Indique la cédula o pasaporte de cada socio o accionista.")
+    elif modalidad == "anexo" and not anexo_base64:
+        raise HTTPException(status_code=400, detail="Adjunte la nómina de socios o accionistas en PDF.")
+    elif modalidad == "autorizacion" and not datos.get("autoriza_consulta_supercias"):
+        raise HTTPException(status_code=400, detail="Debe autorizar la consulta en la web de la Superintendencia de Compañías.")
+    return modalidad, socios
+
+
 def _registrar_empresa(db: Session, empresa_raw: dict, token_obj: RegistrationToken, ip):
     anexo_base64 = empresa_raw.pop("anexo_socios_base64", None)
     anexo_nombre = empresa_raw.pop("anexo_socios_nombre", None)
@@ -191,6 +226,11 @@ def _registrar_empresa(db: Session, empresa_raw: dict, token_obj: RegistrationTo
 
     if datos["ruc"] != token_obj.documento_esperado:
         raise HTTPException(status_code=400, detail="Este enlace fue generado para otro RUC.")
+
+    modalidad, socios = _validar_socios(datos, anexo_base64)
+    datos["socios_modalidad"] = modalidad
+    datos["autoriza_consulta_supercias"] = modalidad == "autorizacion"
+    datos["referencia_supercias"] = None
 
     # Representante legal (persona)
     rep_datos = svc.datos_rep(datos)
@@ -222,8 +262,9 @@ def _registrar_empresa(db: Session, empresa_raw: dict, token_obj: RegistrationTo
         token_id=token_obj.id,
         datos_reportados=company_reportados,
     )
-    svc.guardar_socios(decl_empresa, datos.get("socios"))
-    if datos.get("controlada_supercias") and anexo_base64:
+    if modalidad == "lista":
+        svc.guardar_socios(decl_empresa, socios)
+    elif modalidad == "anexo":
         ruta, nombre = guardar_anexo_pdf(anexo_base64, anexo_nombre, company.ruc)
         decl_empresa.anexo_socios_path = ruta
         decl_empresa.anexo_socios_nombre = nombre
@@ -321,7 +362,8 @@ def registrar_cliente(
         mensajes = []
         for err in e.errors()[:5]:
             campo = ".".join(str(x) for x in err.get("loc", []))
-            mensajes.append(f"{campo}: {err.get('msg', 'valor inválido')}")
+            msg = err.get("msg", "valor inválido").replace("Value error, ", "")
+            mensajes.append(f"{campo}: {msg}" if campo else msg)
         raise HTTPException(
             status_code=400,
             detail="Hay datos inválidos en el formulario. " + "; ".join(mensajes),

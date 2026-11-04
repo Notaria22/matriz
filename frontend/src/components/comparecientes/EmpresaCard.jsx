@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import API_CONFIG, { apiFetch } from "../../config/api";
 import { ResumenPatrimonio } from "./SeccionUAFEForm";
+import { etiquetaActividad } from "../../utils/actividadesEconomicas";
 
 const ROL_TRAMITE = {
   vendedor: "Vendedor / Transferente",
@@ -237,7 +238,8 @@ const EmpresaCard = ({ data }) => {
       {/* Socios / accionistas */}
       {(socios.length > 0 ||
         data.referenciaSupercias ||
-        data.anexoSociosNombre) && (
+        data.anexoSociosNombre ||
+        data.autorizaConsultaSupercias) && (
         <div className="mb-6 pt-4 border-t">
           <h4 className="text-base font-semibold text-gray-700 mb-1 flex items-center gap-2">
             <Users className="w-5 h-5 text-gray-400" />
@@ -287,6 +289,12 @@ const EmpresaCard = ({ data }) => {
             label="Referencia Supercias"
             value={data.referenciaSupercias}
           />
+          {data.autorizaConsultaSupercias && (
+            <p className="mt-2 p-3 text-sm bg-blue-50 border border-blue-200 rounded-lg text-blue-900">
+              La empresa autorizó a la notaría a consultar la nómina de socios o
+              accionistas en la web de la Superintendencia de Compañías.
+            </p>
+          )}
           {data.anexoSociosNombre && (
             <button
               type="button"
@@ -392,6 +400,14 @@ const EmpresaCard = ({ data }) => {
                 icon={User}
                 label="Rol en el trámite"
                 value={ROL_TRAMITE[data.repRolTramite] || data.repRolTramite}
+              />
+              <InfoRow
+                icon={Briefcase}
+                label="Actividad económica"
+                value={etiquetaActividad(
+                  data.repActividadEconomica,
+                  data.repActividadEconomicaOtra,
+                )}
               />
             </div>
             <InfoRow

@@ -4,6 +4,7 @@ import { AlertTriangle, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import { apiFetch } from "../../config/api";
 import { useToast } from "../../hooks/useToast";
 import { ResumenPatrimonio } from "./SeccionUAFEForm";
+import { etiquetaActividad } from "../../utils/actividadesEconomicas";
 
 const ETIQUETAS = {
   document_type: "Tipo de documento",
@@ -180,7 +181,13 @@ const DetalleDeclaracion = ({ id }) => {
   return (
     <div className="pt-2 pb-1 space-y-1">
       {fila("Rol en el trámite", ROL[data.rol_tramite] || data.rol_tramite)}
-      {fila("Actividad económica", data.actividad_economica)}
+      {fila(
+        "Actividad económica",
+        etiquetaActividad(
+          data.actividad_economica,
+          data.actividad_economica_otra,
+        ),
+      )}
       {fila("Empresa donde trabaja", data.empresa_trabajo)}
       {fila(
         "Ingreso mensual",
@@ -209,6 +216,14 @@ const DetalleDeclaracion = ({ id }) => {
             .join(", "),
         )}
       {fila("Referencia Supercias", data.referencia_supercias)}
+      {fila(
+        "Socios informados mediante",
+        {
+          lista: "Lista de socios",
+          anexo: "Nómina adjunta (PDF)",
+          autorizacion: "Autorización de consulta en la web de la Supercias",
+        }[data.socios_modalidad],
+      )}
       {data.situacion_patrimonial && (
         <ResumenPatrimonio
           patrimonio={data.situacion_patrimonial}

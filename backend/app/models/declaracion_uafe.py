@@ -89,6 +89,7 @@ class DeclaracionUAFE(Base):
     actividad_economica = Column(
         enum_column_type(ActividadEconomica, "actividad_economica"), nullable=True
     )  # persona
+    actividad_economica_otra = Column(String(200), nullable=True)  # cuando la actividad es "otro"
     actividad_empresa = Column(String(200), nullable=True)  # empresa
     empresa_trabajo = Column(String(200), nullable=True)
     ingreso_mensual = Column(Numeric(12, 2), nullable=True)
@@ -125,7 +126,11 @@ class DeclaracionUAFE(Base):
 
     # Solo empresa: socios / Superintendencia de Compañías
     controlada_supercias = Column(Boolean, nullable=True)
-    referencia_supercias = Column(String(300), nullable=True)
+    # Cómo informó los socios una empresa controlada: lista | anexo | autorizacion
+    socios_modalidad = Column(String(20), nullable=True)
+    # Autorizó a la notaría a consultar los socios en la web de la Superintendencia
+    autoriza_consulta_supercias = Column(Boolean, nullable=True)
+    referencia_supercias = Column(String(300), nullable=True)  # ya no se pide; se conserva el historial
     anexo_socios_path = Column(String(300), nullable=True)  # ruta interna, nunca se expone
     anexo_socios_nombre = Column(String(200), nullable=True)
 

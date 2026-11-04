@@ -44,6 +44,16 @@ class ActividadEconomica(enum.Enum):
     cuidador_hogar = "cuidador_hogar"
     estudiante = "estudiante"
     ninguna = "ninguna"
+    funcionario_publico = "funcionario_publico"
+    empresario = "empresario"
+    comerciante = "comerciante"
+    emprendedor = "emprendedor"
+    creador_contenido = "creador_contenido"
+    influencer = "influencer"
+    profesional_autonomo = "profesional_autonomo"
+    constructor = "constructor"
+    contratista = "contratista"
+    otro = "otro"  # se especifica en actividad_economica_otra
 
 
 class TipoSujeto(enum.Enum):
@@ -80,6 +90,12 @@ class EstadoDatosReportados(enum.Enum):
     pendiente = "pendiente"
     aplicado = "aplicado"
     descartado = "descartado"
+
+
+class CargoNotarial(enum.Enum):
+    """Solo los usuarios con cargo notarial aparecen como notario en las matrices."""
+    titular = "titular"
+    suplente = "suplente"
 
 
 class EstadoRepresentacion(enum.Enum):

@@ -40,7 +40,8 @@ def _guardar(db: Session, datos: dict, request: Request, usuario: SystemUser, ac
         )
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", include_in_schema=False, status_code=status.HTTP_201_CREATED)
 def save_company(
     company_data: CompanyCreate,
     request: Request,

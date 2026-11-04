@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Enum, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.models.enums import CargoNotarial, Gender, enum_column_type
 import enum
 
 class UserRole(enum.Enum):
@@ -18,6 +19,8 @@ class SystemUser(Base):
     password = Column(String(255), nullable=False)
     rol = Column(Enum(UserRole, name="user_role"), nullable=False)
     iniciales = Column(String(10), nullable=True)
+    cargo_notarial = Column(enum_column_type(CargoNotarial, "cargo_notarial"), nullable=True)
+    genero = Column(enum_column_type(Gender, "genero_usuario"), nullable=True)
     activo = Column(Boolean, default=True, server_default="1", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

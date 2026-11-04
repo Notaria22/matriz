@@ -20,7 +20,8 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else None
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", include_in_schema=False, status_code=status.HTTP_201_CREATED)
 def save_user(
     request: Request,
     user_data: PartyCreate,

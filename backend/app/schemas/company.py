@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
@@ -56,9 +56,14 @@ class CompanyBase(BaseModel):
     controlada_supercias: Optional[bool] = None
     socios: Optional[list[dict[str, Any]]] = None
     referencia_supercias: Optional[str] = Field(None, max_length=300)
+    socios_modalidad: Optional[str] = Field(None, pattern="^(lista|anexo|autorizacion)$")
+    autoriza_consulta_supercias: Optional[bool] = None
 
     # UAFE representante legal
-    rep_actividad_economica: Optional[str] = Field(None, pattern="^(independiente|empleado|jubilado|quehaceres_domesticos|cuidador_hogar|estudiante|ninguna)$")
+    # Para el representante de una empresa no aplican quehaceres domésticos, cuidador del hogar,
+    # influencer ni creador de contenido
+    rep_actividad_economica: Optional[str] = Field(None, pattern="^(independiente|empleado|jubilado|estudiante|ninguna|funcionario_publico|empresario|comerciante|emprendedor|profesional_autonomo|constructor|contratista|otro)$")
+    rep_actividad_economica_otra: Optional[str] = Field(None, max_length=200)
     rep_empresa_trabajo: Optional[str] = Field(None, max_length=200)
     rep_ingreso_mensual: Optional[Decimal] = None
     rep_rol_tramite: Optional[str] = Field(None, pattern="^(vendedor|adquirente)$")
@@ -75,6 +80,14 @@ class CompanyBase(BaseModel):
     rep_pep_ya_no_ejerce: Optional[bool] = None
     rep_pep_fecha_fin: Optional[date] = None
     rep_patrimonio: Optional[dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def validar_actividad_otra_rep(self):
+        if self.rep_actividad_economica == "otro" and not (self.rep_actividad_economica_otra or "").strip():
+            raise ValueError("Especifique la actividad económica del representante legal")
+        if self.rep_actividad_economica != "otro":
+            self.rep_actividad_economica_otra = None
+        return self
 
     @field_validator('ruc')
     @classmethod

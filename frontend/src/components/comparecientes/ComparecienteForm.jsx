@@ -63,6 +63,7 @@ const ComparecienteForm = ({
     partnerNumberStreet: "",
     // Campos UAFE del cónyuge (opcionales)
     partnerActividadEconomica: "",
+    partnerActividadEconomicaOtra: "",
     partnerEmpresaTrabajo: "",
     partnerIngresoMensual: "",
     partnerEsPep: "",
@@ -80,6 +81,7 @@ const ComparecienteForm = ({
     partnerOrigenFondos: "",
     // Campos UAFE (opcionales)
     actividadEconomica: "",
+    actividadEconomicaOtra: "",
     empresaTrabajo: "",
     ingresoMensual: "",
     esPep: "",
@@ -145,6 +147,8 @@ const ComparecienteForm = ({
         partnerNumberStreet: data.partner?.numberStreet || "",
         // Campos UAFE del cónyuge
         partnerActividadEconomica: data.partner?.actividadEconomica || "",
+        partnerActividadEconomicaOtra:
+          data.partner?.actividadEconomicaOtra || "",
         partnerEmpresaTrabajo: data.partner?.empresaTrabajo || "",
         partnerIngresoMensual: data.partner?.ingresoMensual ?? "",
         partnerEsPep:
@@ -172,6 +176,7 @@ const ComparecienteForm = ({
         partnerOrigenFondos: data.partner?.origenFondos || "",
         // Campos UAFE
         actividadEconomica: data.actividadEconomica || "",
+        actividadEconomicaOtra: data.actividadEconomicaOtra || "",
         empresaTrabajo: data.empresaTrabajo || "",
         ingresoMensual: data.ingresoMensual || "",
         esPep: data.esPep === true ? "si" : data.esPep === false ? "no" : "",
@@ -221,9 +226,11 @@ const ComparecienteForm = ({
     [formData.partnerProvince],
   );
 
-  // Resetear pregunta de cónyuge cuando deja de ser casado
+  // Resetear pregunta de cónyuge cuando deja de ser casado.
+  // Con estado civil vacío (al abrir el formulario, antes de cargar los datos)
+  // no se toca nada: si no, este efecto borraba lo que acababa de cargarse.
   useEffect(() => {
-    if (formData.maritalStatus !== "casado") {
+    if (formData.maritalStatus && formData.maritalStatus !== "casado") {
       setFormData((prev) => ({
         ...prev,
         conyugueComparece: true,
@@ -236,7 +243,9 @@ const ComparecienteForm = ({
   useEffect(() => {
     if (formData.maritalStatus === "casado" && formData.conyugueComparece) {
       setShowPartnerForm(true);
-    } else {
+    } else if (formData.maritalStatus) {
+      // Igual que arriba: solo se limpia cuando hay un estado civil elegido,
+      // para no borrar los datos del cónyuge que se están cargando al editar.
       setShowPartnerForm(false);
       setFormData((prev) => ({
         ...prev,
@@ -471,6 +480,10 @@ const ComparecienteForm = ({
       const tienePep = esPepBool === true || esPepIndBool === true;
       Object.assign(dataToSend, {
         actividad_economica: formData.actividadEconomica || null,
+        actividad_economica_otra:
+          formData.actividadEconomica === "otro"
+            ? formData.actividadEconomicaOtra || null
+            : null,
         empresa_trabajo: formData.empresaTrabajo || null,
         ingreso_mensual: formData.ingresoMensual || null,
         origen_fondos: formData.origenFondos || null,
@@ -522,6 +535,10 @@ const ComparecienteForm = ({
         const partnerPayload = transformToSnakeCase(partnerData);
         partnerPayload.actividad_economica =
           formData.partnerActividadEconomica || null;
+        partnerPayload.actividad_economica_otra =
+          formData.partnerActividadEconomica === "otro"
+            ? formData.partnerActividadEconomicaOtra || null
+            : null;
         partnerPayload.empresa_trabajo = formData.partnerEmpresaTrabajo || null;
         partnerPayload.ingreso_mensual = formData.partnerIngresoMensual || null;
         partnerPayload.origen_fondos = formData.partnerOrigenFondos || null;

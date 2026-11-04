@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router";
+import { ACTIVIDADES_ECONOMICAS } from "../../utils/actividadesEconomicas";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -105,6 +106,64 @@ const ORIGENES_FONDOS = [
   },
 ];
 
+// Texto entregado por la notaría (Condiciones jurídicas, declaraciones y autorización)
+const CONDICIONES_JURIDICAS = [
+  {
+    numero: "1",
+    titulo: "Información de identificación incorporada al acto notarial.",
+    texto:
+      "De conformidad con los principios de la administración pública previstos en el artículo 227 de la Constitución de la República, el principio de no duplicidad de información establecido en el artículo 3 numeral 13 de la Ley Orgánica para la Optimización y Eficiencia de Trámites Administrativos, y la prohibición prevista en el artículo 11 de la misma Ley, que impide exigir al usuario información que ya se encuentre disponible, se deja constancia de que los datos de identificación de las personas naturales y jurídicas, así como de sus representantes, constan en la escritura pública o actuación notarial identificada en este formulario y en sus respectivos documentos habilitantes; por lo tanto, no serán requeridos nuevamente.",
+  },
+  {
+    numero: "2",
+    titulo: "Información del acto, contrato u operación.",
+    texto:
+      "Por las mismas razones y fundamentos jurídicos señalados en el numeral anterior, la información correspondiente al valor de la operación, transacción económica, acto o contrato; fecha de realización; moneda utilizada; formas y medios de pago; y demás información económica incorporada al instrumento, consta detallada en la escritura pública o actuación notarial identificada en este formulario. En consecuencia, dicha información no será requerida ni reproducida nuevamente.",
+  },
+  {
+    numero: "3",
+    titulo: "Información para cumplimiento de obligaciones UAFE.",
+    texto:
+      "El usuario declara que la información proporcionada en este formulario es verdadera, completa y actualizada. Cuando corresponda, proporcionará la información necesaria para identificar socios, accionistas, beneficiarios finales y demás personas naturales que ejerzan propiedad o control efectivo sobre sociedades, fideicomisos u otras estructuras jurídicas.",
+  },
+  {
+    numero: "4",
+    titulo: "Autorización para consulta y tratamiento de datos.",
+    texto:
+      "El usuario autoriza a la Notaría Vigésimo Segunda del cantón Quito a recopilar, consultar, verificar, contrastar, almacenar y tratar los datos personales y patrimoniales proporcionados, así como a consultar las bases de datos públicas o legalmente accesibles que resulten necesarias para verificar dicha información y cumplir las obligaciones legales aplicables, especialmente aquellas relacionadas con la prevención, detección y erradicación del lavado de activos y financiamiento de delitos.",
+  },
+  {
+    numero: "5",
+    titulo: "Reserva y confidencialidad.",
+    texto:
+      "La Notaría, el Notario, el Oficial de Cumplimiento y el personal autorizado mantendrán la reserva y confidencialidad de la información obtenida. Esta será utilizada exclusivamente para el cumplimiento de las finalidades legales correspondientes y únicamente será comunicada a la UAFE y a las demás autoridades u organismos de control cuando exista obligación o requerimiento legal.",
+  },
+  {
+    numero: "6",
+    titulo: "Declaración sobre licitud de fondos.",
+    texto:
+      "El usuario declara que los fondos y bienes relacionados con el acto u operación tienen origen lícito y no provienen ni están destinados al lavado de activos, financiamiento del terrorismo u otras actividades ilícitas. Asimismo, asume responsabilidad por la veracidad de la información proporcionada y reconoce que la intervención del Notario se limita al ejercicio de sus atribuciones legales.",
+  },
+  {
+    numero: "7",
+    titulo: "Consentimiento y conocimiento del acto.",
+    texto:
+      "El usuario manifiesta que conoce y comprende el contenido, alcance y efectos del acto o contrato que celebra; que actúa libre y voluntariamente; y que ha recibido las explicaciones jurídicas correspondientes del abogado patrocinador, cuando lo hubiere, y del Notario dentro del ámbito de sus competencias.",
+  },
+  {
+    numero: "8",
+    titulo: "Prevención de riesgos.",
+    texto:
+      "El usuario declara haber sido informado sobre los riesgos de realizar operaciones con personas desconocidas o sin referencias suficientes y reconoce la importancia de verificar los antecedentes e información de las personas con quienes contrata.",
+  },
+  {
+    numero: "9",
+    titulo: "Personas que no saben leer ni escribir.",
+    texto:
+      "Cuando el usuario no sepa leer ni escribir, declara que el contenido de este documento le ha sido leído y explicado en forma clara, con intervención de su testigo de confianza cuando corresponda, y expresa su conformidad mediante la impresión de su huella digital.",
+  },
+];
+
 const TIPOS_INMUEBLE_PATRIMONIO = [
   { value: "casa", label: "Casa" },
   { value: "terreno", label: "Terreno" },
@@ -112,12 +171,19 @@ const TIPOS_INMUEBLE_PATRIMONIO = [
   { value: "departamento", label: "Departamento" },
   { value: "suite", label: "Suite" },
   { value: "oficina", label: "Oficina" },
+  { value: "otro", label: "Otro" },
 ];
 
-const inmuebleInicial = () => ({ tipo: "", ciudad: "", valor: "" });
+const inmuebleInicial = () => ({
+  tipo: "",
+  especificar: "",
+  ciudad: "",
+  valor: "",
+});
 const vehiculoInicial = () => ({ marca: "", modelo: "", placa: "", valor: "" });
+const accionInicial = () => ({ entidad: "", monto: "" });
 
-// Cada inmueble y cada vehículo es una fila con sus propios datos.
+// Cada inmueble, vehículo y participación en empresas es una fila con sus datos.
 const patrimonioInicial = () => ({
   inmuebles: [inmuebleInicial()],
   no_posee_inmuebles: false,
@@ -125,7 +191,25 @@ const patrimonioInicial = () => ({
   no_posee_vehiculos: false,
   inversiones: "",
   no_posee_inversiones: false,
+  acciones: [accionInicial()],
+  no_posee_acciones: false,
 });
+
+// Total informativo: inmuebles + vehículos + acciones o participaciones
+const totalPatrimonio = (pat) => {
+  const suma = (lista, campo, excluido) =>
+    excluido
+      ? 0
+      : (lista || []).reduce((t, f) => t + (parseFloat(f[campo]) || 0), 0);
+  return (
+    suma(pat.inmuebles, "valor", pat.no_posee_inmuebles) +
+    suma(pat.vehiculos, "valor", pat.no_posee_vehiculos) +
+    suma(pat.acciones, "monto", pat.no_posee_acciones)
+  );
+};
+
+const formatoUSD = (n) =>
+  n.toLocaleString("es-EC", { style: "currency", currency: "USD" });
 
 const socioInicial = () => ({
   nombres: "",
@@ -169,7 +253,13 @@ const limpiarPatrimonio = (pat) => {
   const conDatos = (fila) => Object.values(fila).some((v) => v !== "");
   p.inmuebles = p.no_posee_inmuebles
     ? []
-    : p.inmuebles.map(limpiar).filter(conDatos);
+    : p.inmuebles
+        .map(limpiar)
+        .map((i) => (i.tipo === "otro" ? i : { ...i, especificar: "" }))
+        .filter(conDatos);
+  p.acciones = p.no_posee_acciones
+    ? []
+    : (p.acciones || []).map(limpiar).filter(conDatos);
   p.vehiculos = p.no_posee_vehiculos
     ? []
     : p.vehiculos
@@ -213,6 +303,7 @@ const personaInicial = () => ({
   occupation: "",
   profession: "",
   actividad_economica: "",
+  actividad_economica_otra: "",
   empresa_trabajo: "",
   ingreso_mensual: "",
   rol_tramite: "",
@@ -254,6 +345,8 @@ const empresaInicial = () => ({
   origen_fondos_lista: [],
   origen_fondos_detalle: {},
   controlada_supercias: "",
+  socios_modalidad: "",
+  autoriza_consulta_supercias: false,
   socios: [socioInicial()],
   referencia_supercias: "",
   anexo_socios_base64: "",
@@ -278,6 +371,7 @@ const empresaInicial = () => ({
   rep_profession: "",
   rep_position: "",
   rep_actividad_economica: "",
+  rep_actividad_economica_otra: "",
   rep_empresa_trabajo: "",
   rep_ingreso_mensual: "",
   rep_rol_tramite: "",
@@ -457,7 +551,7 @@ const SeccionConyugue = ({ datos, onChange, errors, prefijo = "" }) => {
             className="w-4 h-4 text-gray-600 rounded"
           />
           <span className="text-sm font-medium text-gray-700">
-            El cónyuge no comparece en este trámite
+            El cónyuge no comparece en este trámite.
           </span>
         </label>
       </div>
@@ -793,15 +887,15 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
           Situación patrimonial
         </p>
         <p className="text-xs text-gray-600">
-          Estimado usuario, por favor suministre información respecto a su
-          situación patrimonial.
+          Estimado usuario, por cumplimiento de la normativa UAFE, proporcione
+          la siguiente información sobre su situación patrimonial.
         </p>
       </div>
 
       {/* Inmuebles */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          Identifique las propiedades inmuebles de las que es propietario
+          Identifique las propiedades inmuebles de las que es propietario.
         </label>
         {!pat.no_posee_inmuebles && (
           <div className="space-y-3">
@@ -836,6 +930,28 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
                       ))}
                     </select>
                     {errorMsg(`inmuebles_${i}_tipo`)}
+                    {inm.tipo === "otro" && (
+                      <>
+                        <input
+                          type="text"
+                          value={inm.especificar || ""}
+                          onChange={(e) =>
+                            setFila(
+                              "inmuebles",
+                              i,
+                              "especificar",
+                              e.target.value,
+                            )
+                          }
+                          className={`mt-2 ${inputClass(
+                            errors,
+                            key(`inmuebles_${i}_especificar`),
+                          )}`}
+                          placeholder="Especifique: Ej. bodega, local comercial"
+                        />
+                        {errorMsg(`inmuebles_${i}_especificar`)}
+                      </>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">
@@ -901,7 +1017,7 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
             className="w-4 h-4 rounded text-gray-600"
           />
           <span className="text-sm text-gray-600">
-            No posee bienes inmuebles
+            No posee bienes inmuebles.
           </span>
         </label>
         {errorMsg("inmuebles")}
@@ -910,7 +1026,7 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
       {/* Vehículos */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          Identifique los vehículos de los que es propietario
+          Identifique los vehículos de los que es propietario.
         </label>
         {!pat.no_posee_vehiculos && (
           <div className="space-y-3">
@@ -1031,7 +1147,7 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
             }
             className="w-4 h-4 rounded text-gray-600"
           />
-          <span className="text-sm text-gray-600">No posee vehículos</span>
+          <span className="text-sm text-gray-600">No posee vehículos.</span>
         </label>
         {errorMsg("vehiculos")}
       </div>
@@ -1039,9 +1155,8 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
       {/* Inversiones */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          En caso de que tenga inversiones o pólizas en instituciones
-          financieras, fondos de acumulación y fideicomisos, señale el nombre de
-          las entidades
+          Si tiene inversiones, pólizas, fondos de acumulación o fideicomisos,
+          indique las entidades donde los mantiene.
         </label>
         {!pat.no_posee_inversiones && (
           <input
@@ -1060,10 +1175,114 @@ const SeccionPatrimonio = ({ datos, onChange, errors, prefijo = "" }) => {
             className="w-4 h-4 rounded text-gray-600"
           />
           <span className="text-sm text-gray-600">
-            No posee inversiones, pólizas, fondos ni fideicomisos
+            No posee inversiones, pólizas, fondos ni fideicomisos.
           </span>
         </label>
         {errorMsg("inversiones")}
+      </div>
+
+      {/* Acciones o participaciones */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Si tiene acciones, participaciones o capital invertido en empresas
+          nacionales o extranjeras, indique las entidades y el monto de sus
+          inversiones.
+        </label>
+        {!pat.no_posee_acciones && (
+          <div className="space-y-3">
+            {(pat.acciones || []).map((acc, i) => (
+              <div
+                key={i}
+                className="p-3 bg-white border border-gray-200 rounded-lg space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">
+                    Inversión {i + 1}
+                  </span>
+                  {botonQuitar("acciones", i)}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Empresa o entidad
+                    </label>
+                    <input
+                      type="text"
+                      value={acc.entidad}
+                      onChange={(e) =>
+                        setFila("acciones", i, "entidad", e.target.value)
+                      }
+                      className={inputClass(
+                        errors,
+                        key(`acciones_${i}_entidad`),
+                      )}
+                      placeholder="Ej: Constructora Andes S.A."
+                    />
+                    {errorMsg(`acciones_${i}_entidad`)}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Monto invertido (USD)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={acc.monto}
+                      onChange={(e) =>
+                        setFila("acciones", i, "monto", e.target.value)
+                      }
+                      className={inputClass(errors, key(`acciones_${i}_monto`))}
+                      placeholder="Ej: 20000"
+                    />
+                    {errorMsg(`acciones_${i}_monto`)}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => agregarFila("acciones", accionInicial())}
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              + Agregar otra inversión
+            </button>
+          </div>
+        )}
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={pat.no_posee_acciones}
+            onChange={(e) =>
+              toggleNoPosee(
+                "no_posee_acciones",
+                "acciones",
+                accionInicial,
+                e.target.checked,
+              )
+            }
+            className="w-4 h-4 rounded text-gray-600"
+          />
+          <span className="text-sm text-gray-600">
+            No posee acciones, participaciones ni capital invertido en empresas.
+          </span>
+        </label>
+        {errorMsg("acciones")}
+      </div>
+
+      {/* Total informativo */}
+      <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <div>
+          <p className="text-sm font-medium text-gray-800">
+            Total de bienes declarados
+          </p>
+          <p className="text-xs text-gray-500">
+            Suma informativa de inmuebles, vehículos y acciones o
+            participaciones.
+          </p>
+        </div>
+        <p className="text-lg font-semibold text-gray-900">
+          {formatoUSD(totalPatrimonio(pat))}
+        </p>
       </div>
     </div>
   );
@@ -1100,12 +1319,12 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
       file.type !== "application/pdf" &&
       !file.name.toLowerCase().endsWith(".pdf")
     ) {
-      setErrorArchivo("El archivo debe ser PDF");
+      setErrorArchivo("El archivo debe ser PDF.");
       e.target.value = "";
       return;
     }
     if (file.size > MAX_ANEXO_MB * 1024 * 1024) {
-      setErrorArchivo(`El archivo supera ${MAX_ANEXO_MB} MB`);
+      setErrorArchivo(`El archivo supera ${MAX_ANEXO_MB} MB.`);
       e.target.value = "";
       return;
     }
@@ -1114,7 +1333,7 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
       onChange("anexo_socios_base64", reader.result);
       onChange("anexo_socios_nombre", file.name);
     };
-    reader.onerror = () => setErrorArchivo("No se pudo leer el archivo");
+    reader.onerror = () => setErrorArchivo("No se pudo leer el archivo.");
     reader.readAsDataURL(file);
   };
 
@@ -1123,7 +1342,22 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
     onChange("anexo_socios_nombre", "");
   };
 
+  // Empresa controlada: elige UNA forma de informar los socios.
+  // Extranjera o no controlada: siempre la lista con documento.
+  const modalidad = controlada === "si" ? datos.socios_modalidad : "lista";
   const docObligatorio = controlada === "no";
+
+  const MODALIDADES = [
+    {
+      v: "lista",
+      l: "Escribir los nombres y apellidos de los socios o accionistas.",
+    },
+    { v: "anexo", l: "Adjuntar la nómina de socios o accionistas (PDF)." },
+    {
+      v: "autorizacion",
+      l: "Autorizar a la notaría a consultar la información en la web de la Superintendencia de Compañías.",
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -1156,170 +1390,207 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
         )}
       </div>
 
-      {controlada && (
-        <>
-          <p className="text-xs text-gray-600">
-            {controlada === "si"
-              ? "Indique los nombres y apellidos de los socios o accionistas. También puede adjuntar el listado que emite la Superintendencia de Compañías o citarlo."
-              : "Indique los socios o accionistas con su número de cédula (ecuatorianos) o pasaporte (extranjeros)."}
+      {controlada === "si" && (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-700">
+            Indique los nombres y apellidos de los socios o accionistas. O, si
+            lo prefiere, adjunte la nómina correspondiente o autorice el acceso
+            a la información disponible en la web de la Superintendencia de
+            Compañías.
           </p>
-
-          <div className="space-y-3">
-            {socios.map((socio, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-12 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200"
+          <div className="space-y-2">
+            {MODALIDADES.map(({ v, l }) => (
+              <label
+                key={v}
+                className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${
+                  modalidad === v
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
               >
-                <div className="col-span-12 md:col-span-5">
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Nombres y apellidos
-                  </label>
-                  <input
-                    type="text"
-                    value={socio.nombres}
-                    onChange={(e) =>
-                      setSocio(i, "nombres", e.target.value.toUpperCase())
-                    }
-                    className={inputClass(errors, `socios_${i}_nombres`)}
-                    placeholder="NOMBRES Y APELLIDOS"
-                  />
-                  {errors[`socios_${i}_nombres`] && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors[`socios_${i}_nombres`]}
-                    </p>
-                  )}
-                </div>
-                <div className="col-span-4 md:col-span-2">
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Documento
-                  </label>
-                  <select
-                    value={socio.tipo_documento}
-                    onChange={(e) =>
-                      setSocio(i, "tipo_documento", e.target.value)
-                    }
-                    className={inputClass(errors, `socios_${i}_tipo_documento`)}
-                  >
-                    <option value="cedula">Cédula</option>
-                    <option value="pasaporte">Pasaporte</option>
-                  </select>
-                </div>
-                <div className="col-span-8 md:col-span-3">
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Número{docObligatorio ? "" : " (opcional)"}
-                  </label>
-                  <input
-                    type="text"
-                    value={socio.numero_documento}
-                    onChange={(e) =>
-                      setSocio(
-                        i,
-                        "numero_documento",
-                        e.target.value.toUpperCase(),
-                      )
-                    }
-                    className={inputClass(
-                      errors,
-                      `socios_${i}_numero_documento`,
-                    )}
-                    maxLength={socio.tipo_documento === "cedula" ? 10 : 20}
-                  />
-                  {errors[`socios_${i}_numero_documento`] && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors[`socios_${i}_numero_documento`]}
-                    </p>
-                  )}
-                </div>
-                <div className="col-span-8 md:col-span-1">
-                  <label className="block text-xs text-gray-600 mb-1">%</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={socio.porcentaje}
-                    onChange={(e) => setSocio(i, "porcentaje", e.target.value)}
-                    className={inputClass(errors, `socios_${i}_porcentaje`)}
-                  />
-                </div>
-                <div className="col-span-4 md:col-span-1 flex items-end">
-                  {socios.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => quitar(i)}
-                      className="text-red-600 hover:text-red-800 text-xs font-medium pb-2"
-                    >
-                      Quitar
-                    </button>
-                  )}
-                </div>
-              </div>
+                <input
+                  type="radio"
+                  name="socios_modalidad"
+                  checked={modalidad === v}
+                  onChange={() => onChange("socios_modalidad", v)}
+                  className="mt-0.5"
+                />
+                <span className="text-sm text-gray-800">{l}</span>
+              </label>
             ))}
-            <button
-              type="button"
-              onClick={agregar}
-              className="text-sm px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
-            >
-              + Agregar socio o accionista
-            </button>
           </div>
+          {errors.socios_modalidad && (
+            <p className="text-red-500 text-xs">{errors.socios_modalidad}</p>
+          )}
+        </div>
+      )}
 
-          {controlada === "si" && (
-            <div className="space-y-3 p-3 border border-gray-200 rounded-lg">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Adjuntar listado de socios de la Superintendencia de Compañías
-                  (PDF, opcional)
-                </label>
-                {datos.anexo_socios_nombre ? (
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="text-gray-700">
-                      {datos.anexo_socios_nombre}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={quitarArchivo}
-                      className="text-red-600 hover:text-red-800 text-xs font-medium"
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                ) : (
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={handleArchivo}
-                    className="block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Máximo {MAX_ANEXO_MB} MB.
-                </p>
-                {errorArchivo && (
-                  <p className="text-red-500 text-xs mt-1">{errorArchivo}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  O cite el listado (opcional)
+      {controlada === "no" && (
+        <p className="text-sm text-gray-700">
+          Indique los socios o accionistas con su número de cédula
+          (ecuatorianos) o pasaporte (extranjeros).
+        </p>
+      )}
+
+      {controlada && modalidad === "lista" && (
+        <div className="space-y-3">
+          {socios.map((socio, i) => (
+            <div
+              key={i}
+              className="grid grid-cols-12 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200"
+            >
+              <div className="col-span-12 md:col-span-5">
+                <label className="block text-xs text-gray-600 mb-1">
+                  Nombres y apellidos
                 </label>
                 <input
                   type="text"
-                  value={datos.referencia_supercias || ""}
+                  value={socio.nombres}
                   onChange={(e) =>
-                    onChange("referencia_supercias", e.target.value)
+                    setSocio(i, "nombres", e.target.value.toUpperCase())
                   }
-                  className={inputClass(errors, "referencia_supercias")}
-                  placeholder="Ej: Listado de socios de la Superintendencia de Compañías con corte al 15/10/2026"
+                  className={inputClass(errors, `socios_${i}_nombres`)}
+                  placeholder="NOMBRES Y APELLIDOS"
+                />
+                {errors[`socios_${i}_nombres`] && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors[`socios_${i}_nombres`]}
+                  </p>
+                )}
+              </div>
+              <div className="col-span-4 md:col-span-2">
+                <label className="block text-xs text-gray-600 mb-1">
+                  Documento
+                </label>
+                <select
+                  value={socio.tipo_documento}
+                  onChange={(e) =>
+                    setSocio(i, "tipo_documento", e.target.value)
+                  }
+                  className={inputClass(errors, `socios_${i}_tipo_documento`)}
+                >
+                  <option value="cedula">Cédula</option>
+                  <option value="pasaporte">Pasaporte</option>
+                </select>
+              </div>
+              <div className="col-span-8 md:col-span-3">
+                <label className="block text-xs text-gray-600 mb-1">
+                  Número{docObligatorio ? "" : " (opcional)"}
+                </label>
+                <input
+                  type="text"
+                  value={socio.numero_documento}
+                  onChange={(e) =>
+                    setSocio(
+                      i,
+                      "numero_documento",
+                      e.target.value.toUpperCase(),
+                    )
+                  }
+                  className={inputClass(errors, `socios_${i}_numero_documento`)}
+                  maxLength={socio.tipo_documento === "cedula" ? 10 : 20}
+                />
+                {errors[`socios_${i}_numero_documento`] && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors[`socios_${i}_numero_documento`]}
+                  </p>
+                )}
+              </div>
+              <div className="col-span-8 md:col-span-1">
+                <label className="block text-xs text-gray-600 mb-1">%</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={socio.porcentaje}
+                  onChange={(e) => setSocio(i, "porcentaje", e.target.value)}
+                  className={inputClass(errors, `socios_${i}_porcentaje`)}
                 />
               </div>
+              <div className="col-span-4 md:col-span-1 flex items-end">
+                {socios.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => quitar(i)}
+                    className="text-red-600 hover:text-red-800 text-xs font-medium pb-2"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
             </div>
-          )}
-          {errors.socios && (
-            <p className="text-red-500 text-xs">{errors.socios}</p>
-          )}
-        </>
+          ))}
+          <button
+            type="button"
+            onClick={agregar}
+            className="text-sm px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
+          >
+            + Agregar socio o accionista
+          </button>
+        </div>
       )}
+
+      {controlada === "si" && modalidad === "anexo" && (
+        <div className="p-3 border border-gray-200 rounded-lg">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nómina de socios o accionistas (PDF)
+          </label>
+          {datos.anexo_socios_nombre ? (
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-gray-700">{datos.anexo_socios_nombre}</span>
+              <button
+                type="button"
+                onClick={quitarArchivo}
+                className="text-red-600 hover:text-red-800 text-xs font-medium"
+              >
+                Quitar
+              </button>
+            </div>
+          ) : (
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={handleArchivo}
+              className="block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            Máximo {MAX_ANEXO_MB} MB.
+          </p>
+          {errorArchivo && (
+            <p className="text-red-500 text-xs mt-1">{errorArchivo}</p>
+          )}
+          {errors.anexo_socios && (
+            <p className="text-red-500 text-xs mt-1">{errors.anexo_socios}</p>
+          )}
+        </div>
+      )}
+
+      {controlada === "si" && modalidad === "autorizacion" && (
+        <label className="flex items-start gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!datos.autoriza_consulta_supercias}
+            onChange={(e) =>
+              onChange("autoriza_consulta_supercias", e.target.checked)
+            }
+            className="mt-0.5"
+          />
+          <span className="text-sm text-gray-800">
+            Autorizo a la Notaría Vigésimo Segunda del cantón Quito a consultar
+            la nómina de socios o accionistas de la empresa en la web de la
+            Superintendencia de Compañías.
+          </span>
+        </label>
+      )}
+      {errors.autoriza_consulta_supercias && (
+        <p className="text-red-500 text-xs">
+          {errors.autoriza_consulta_supercias}
+        </p>
+      )}
+
+      {errors.socios && <p className="text-red-500 text-xs">{errors.socios}</p>}
     </div>
   );
 };
@@ -1340,6 +1611,8 @@ const SeccionUAFE = ({
   const noEsPepIndirecto =
     noesPep && datos[`${prefijo}es_pep_indirecto`] === "no";
   const actEco = datos[`${prefijo}actividad_economica`];
+  // El representante legal de una empresa no ve las opciones solo de personas
+  const esRepresentanteEmpresa = prefijo === "rep_";
   const labelOrigenFondos =
     datos[`${prefijo}rol_tramite`] === "adquirente"
       ? "Origen de los fondos con los que pagará el bien que adquiere"
@@ -1363,13 +1636,13 @@ const SeccionUAFE = ({
             className={inputClass(errors, `${prefijo}actividad_economica`)}
           >
             <option value="">Seleccione</option>
-            <option value="independiente">Independiente</option>
-            <option value="empleado">Empleado</option>
-            <option value="jubilado">Jubilado</option>
-            <option value="quehaceres_domesticos">Quehaceres Domésticos</option>
-            <option value="cuidador_hogar">Cuidador del Hogar</option>
-            <option value="estudiante">Estudiante</option>
-            <option value="ninguna">Ninguna</option>
+            {ACTIVIDADES_ECONOMICAS.filter(
+              (a) => !(esRepresentanteEmpresa && a.soloPersona),
+            ).map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
           </select>
           {errors[`${prefijo}actividad_economica`] && (
             <p className="text-red-500 text-xs mt-1">
@@ -1398,6 +1671,31 @@ const SeccionUAFE = ({
             </p>
           )}
         </div>
+        {actEco === "otro" && (
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Especifique su actividad económica
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}actividad_economica_otra`] || ""}
+              onChange={(e) =>
+                onChange(`${prefijo}actividad_economica_otra`, e.target.value)
+              }
+              className={inputClass(
+                errors,
+                `${prefijo}actividad_economica_otra`,
+              )}
+              placeholder="Ej: Agricultor"
+              maxLength={200}
+            />
+            {errors[`${prefijo}actividad_economica_otra`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}actividad_economica_otra`]}
+              </p>
+            )}
+          </div>
+        )}
         {(actEco === "empleado" || actEco === "independiente") && (
           <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2284,6 +2582,10 @@ const prepararUAFE = (datos, p = "") => {
     [`${p}origen_fondos`]: datos[`${p}rol_tramite`]
       ? construirOrigenFondosTexto(datos, p) || null
       : null,
+    [`${p}actividad_economica_otra`]:
+      datos[`${p}actividad_economica`] === "otro"
+        ? (datos[`${p}actividad_economica_otra`] || "").trim() || null
+        : null,
     [`${p}es_pep`]: esPep,
     [`${p}es_pep_indirecto`]: datos[`${p}es_pep`] === "no" ? esIndirecto : null,
     [`${p}pep_nombre`]: esIndirecto ? val("pep_nombre") : null,
@@ -2304,6 +2606,14 @@ const prepararUAFE = (datos, p = "") => {
 // ============================================
 // VALIDACIONES
 // ============================================
+// El cónyuge, el representado y su cónyuge guardan sus datos SIN prefijo
+// (names, email...), pero sus errores se muestran con prefijo (c_, r_, cr_)
+// para no mezclarse con los del titular: se valida sin prefijo y luego se agrega.
+const conPrefijo = (errores, prefijo) =>
+  Object.fromEntries(
+    Object.entries(errores).map(([campo, msg]) => [prefijo + campo, msg]),
+  );
+
 const validarPersona = (datos, prefijo = "") => {
   const e = {};
   const p = prefijo;
@@ -2312,14 +2622,14 @@ const validarPersona = (datos, prefijo = "") => {
     datos[`${p}document_type`] === "cedula" &&
     !/^\d{10}$/.test(datos[`${p}document_number`])
   )
-    e[`${p}document_number`] = "Cédula debe tener 10 dígitos";
+    e[`${p}document_number`] = "La cédula debe tener 10 dígitos.";
   if (!datos[`${p}names`]?.trim()) e[`${p}names`] = "Requerido";
   if (!datos[`${p}last_names`]?.trim()) e[`${p}last_names`] = "Requerido";
   if (!datos[`${p}gender`]) e[`${p}gender`] = "Requerido";
   if (!datos[`${p}birth_date`]) e[`${p}birth_date`] = "Requerido";
   if (!datos[`${p}email`]) e[`${p}email`] = "Requerido";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos[`${p}email`]))
-    e[`${p}email`] = "Email inválido";
+    e[`${p}email`] = "Correo electrónico inválido.";
   if (!datos[`${p}phone`]) e[`${p}phone`] = "Requerido";
   if (!datos[`${p}province`]) e[`${p}province`] = "Requerido";
   if (!datos[`${p}canton`]) e[`${p}canton`] = "Requerido";
@@ -2335,7 +2645,7 @@ const validarOrigenFondos = (datos, p = "") => {
   const lista = datos[`${p}origen_fondos_lista`] || [];
   const detalle = datos[`${p}origen_fondos_detalle`] || {};
   if (lista.length === 0) {
-    e[`${p}origen_fondos`] = "Seleccione al menos una opción";
+    e[`${p}origen_fondos`] = "Seleccione al menos una opción.";
     return e;
   }
   ORIGENES_FONDOS.filter((o) => lista.includes(o.value) && o.detalles).forEach(
@@ -2358,9 +2668,11 @@ const validarPatrimonio = (datos, p = "") => {
 
   if (!pat.no_posee_inmuebles) {
     if (pat.inmuebles.length === 0)
-      e[k("inmuebles")] = "Agregue sus inmuebles o marque que no posee";
+      e[k("inmuebles")] = "Agregue sus inmuebles o marque que no posee.";
     pat.inmuebles.forEach((inm, i) => {
       if (vacio(inm.tipo)) e[k(`inmuebles_${i}_tipo`)] = "Requerido";
+      else if (inm.tipo === "otro" && vacio(inm.especificar))
+        e[k(`inmuebles_${i}_especificar`)] = "Especifique el tipo de inmueble.";
       if (vacio(inm.ciudad)) e[k(`inmuebles_${i}_ciudad`)] = "Requerido";
       if (vacio(inm.valor)) e[k(`inmuebles_${i}_valor`)] = "Requerido";
     });
@@ -2368,19 +2680,29 @@ const validarPatrimonio = (datos, p = "") => {
 
   if (!pat.no_posee_vehiculos) {
     if (pat.vehiculos.length === 0)
-      e[k("vehiculos")] = "Agregue sus vehículos o marque que no posee";
+      e[k("vehiculos")] = "Agregue sus vehículos o marque que no posee.";
     pat.vehiculos.forEach((veh, i) => {
       if (vacio(veh.marca)) e[k(`vehiculos_${i}_marca`)] = "Requerido";
       if (vacio(veh.modelo)) e[k(`vehiculos_${i}_modelo`)] = "Requerido";
       if (vacio(veh.placa)) e[k(`vehiculos_${i}_placa`)] = "Requerido";
       else if (!/^[A-Z0-9-]{5,10}$/i.test(veh.placa.trim()))
-        e[k(`vehiculos_${i}_placa`)] = "Placa inválida";
+        e[k(`vehiculos_${i}_placa`)] = "Placa inválida.";
       if (vacio(veh.valor)) e[k(`vehiculos_${i}_valor`)] = "Requerido";
     });
   }
 
   if (!pat.no_posee_inversiones && vacio(pat.inversiones))
-    e[k("inversiones")] = "Indique las entidades o marque que no posee";
+    e[k("inversiones")] = "Indique las entidades o marque que no posee.";
+
+  if (!pat.no_posee_acciones) {
+    const acciones = pat.acciones || [];
+    if (acciones.length === 0)
+      e[k("acciones")] = "Agregue sus inversiones o marque que no posee.";
+    acciones.forEach((acc, i) => {
+      if (vacio(acc.entidad)) e[k(`acciones_${i}_entidad`)] = "Requerido";
+      if (vacio(acc.monto)) e[k(`acciones_${i}_monto`)] = "Requerido";
+    });
+  }
   return e;
 };
 
@@ -2395,7 +2717,7 @@ const validarDatosPEP = (datos, p = "", esIndirecto = false) => {
       datos[`${p}pep_fecha_inicio`] &&
       datos[`${p}pep_fecha_fin`] < datos[`${p}pep_fecha_inicio`]
     )
-      e[`${p}pep_fecha_fin`] = "No puede ser anterior a la fecha de inicio";
+      e[`${p}pep_fecha_fin`] = "No puede ser anterior a la fecha de inicio.";
   }
   if (esIndirecto) {
     if (!datos[`${p}pep_nombre`]) e[`${p}pep_nombre`] = "Requerido";
@@ -2412,6 +2734,11 @@ const validarUAFE = (datos, prefijo = "", validarOrigen = false) => {
   const p = prefijo;
   if (!datos[`${p}actividad_economica`])
     e[`${p}actividad_economica`] = "Requerido";
+  else if (
+    datos[`${p}actividad_economica`] === "otro" &&
+    !(datos[`${p}actividad_economica_otra`] || "").trim()
+  )
+    e[`${p}actividad_economica_otra`] = "Especifique su actividad.";
   if (!datos[`${p}ingreso_mensual`]) e[`${p}ingreso_mensual`] = "Requerido";
   if (validarOrigen) {
     if (!datos[`${p}rol_tramite`]) e[`${p}rol_tramite`] = "Requerido";
@@ -2434,38 +2761,44 @@ const validarSocios = (datos) => {
     e.controlada_supercias = "Requerido";
     return e;
   }
+  const controlada = datos.controlada_supercias === "si";
+  const modalidad = controlada ? datos.socios_modalidad : "lista";
+
+  if (!modalidad) {
+    e.socios_modalidad = "Elija cómo va a informar los socios o accionistas.";
+    return e;
+  }
+  if (modalidad === "anexo") {
+    if (!datos.anexo_socios_base64)
+      e.anexo_socios = "Adjunte la nómina en PDF.";
+    return e;
+  }
+  if (modalidad === "autorizacion") {
+    if (!datos.autoriza_consulta_supercias)
+      e.autoriza_consulta_supercias = "Debe marcar la autorización.";
+    return e;
+  }
+
   const socios = (datos.socios || []).filter(
     (s) => s.nombres.trim() || s.numero_documento.trim(),
   );
-  const docObligatorio = datos.controlada_supercias === "no";
-
   (datos.socios || []).forEach((s, i) => {
     const tieneAlgo = s.nombres.trim() || s.numero_documento.trim();
     if (!tieneAlgo) return;
     if (!s.nombres.trim()) e[`socios_${i}_nombres`] = "Requerido";
     const num = s.numero_documento.trim();
-    if (docObligatorio && !num) e[`socios_${i}_numero_documento`] = "Requerido";
+    if (!controlada && !num) e[`socios_${i}_numero_documento`] = "Requerido";
     if (num && s.tipo_documento === "cedula" && !/^\d{10}$/.test(num))
-      e[`socios_${i}_numero_documento`] = "Cédula debe tener 10 dígitos";
+      e[`socios_${i}_numero_documento`] = "La cédula debe tener 10 dígitos.";
   });
-
-  if (docObligatorio) {
-    if (socios.length === 0)
-      e.socios = "Ingrese al menos un socio o accionista";
-  } else {
-    const tieneAlternativa =
-      datos.anexo_socios_base64 || (datos.referencia_supercias || "").trim();
-    if (socios.length === 0 && !tieneAlternativa)
-      e.socios =
-        "Ingrese al menos un socio, adjunte el listado de la Superintendencia o cítelo";
-  }
+  if (socios.length === 0) e.socios = "Ingrese al menos un socio o accionista.";
   return e;
 };
 
 const validarEmpresa = (datos) => {
   const e = {};
   if (!datos.ruc) e.ruc = "Requerido";
-  else if (!/^\d{13}$/.test(datos.ruc)) e.ruc = "RUC debe tener 13 dígitos";
+  else if (!/^\d{13}$/.test(datos.ruc)) e.ruc = "El RUC debe tener 13 dígitos.";
   if (!datos.razon_social?.trim()) e.razon_social = "Requerido";
   if (!datos.email) e.email = "Requerido";
   if (!datos.phone) e.phone = "Requerido";
@@ -2673,8 +3006,8 @@ const RegistroClientePage = () => {
           // No validar cónyuge separado
         } else {
           const errC = {
-            ...validarPersona(conyugue, "c_"),
-            ...validarUAFE(conyugue, "c_", false),
+            ...conPrefijo(validarPersona(conyugue), "c_"),
+            ...conPrefijo(validarUAFE(conyugue, "", false), "c_"),
           };
           if (mismaDir)
             [
@@ -2706,15 +3039,18 @@ const RegistroClientePage = () => {
         );
         if (usarRepresentadoSeparado) {
           const errR = {
-            ...validarPersona(representado, "r_"),
-            ...validarUAFE(representado, "r_", true),
+            ...conPrefijo(validarPersona(representado), "r_"),
+            ...conPrefijo(validarUAFE(representado, "", true), "r_"),
           };
           e = { ...e, ...errR };
           // Cónyuge del representado
           if (esCasadoRepresentado && representadoConyugueComparece) {
             const errCR = {
-              ...validarPersona(conyugueRepresentado, "cr_"),
-              ...validarUAFE(conyugueRepresentado, "cr_", false),
+              ...conPrefijo(validarPersona(conyugueRepresentado), "cr_"),
+              ...conPrefijo(
+                validarUAFE(conyugueRepresentado, "", false),
+                "cr_",
+              ),
             };
             if (mismaDirRepresentado)
               [
@@ -2731,9 +3067,9 @@ const RegistroClientePage = () => {
       }
     }
     if (!aceptaPrivacidad)
-      e.privacidad = "Debe aceptar el tratamiento de sus datos";
+      e.privacidad = "Debe aceptar el tratamiento de sus datos.";
     if (!aceptaCondiciones)
-      e.condiciones = "Debe aceptar las condiciones jurídicas";
+      e.condiciones = "Debe aceptar las condiciones jurídicas.";
     return e;
   };
 
@@ -2755,15 +3091,19 @@ const RegistroClientePage = () => {
     try {
       let payload;
       if (tipoRegistro === "empresa") {
-        const sociosValidos = (empresa.socios || [])
-          .filter((x) => x.nombres.trim() || x.numero_documento.trim())
-          .map((x) => ({
-            nombres: x.nombres.trim(),
-            tipo_documento: x.tipo_documento,
-            numero_documento: x.numero_documento.trim() || null,
-            porcentaje: x.porcentaje === "" ? null : x.porcentaje,
-          }));
         const esControlada = empresa.controlada_supercias === "si";
+        const modalidad = esControlada ? empresa.socios_modalidad : "lista";
+        const sociosValidos =
+          modalidad === "lista"
+            ? (empresa.socios || [])
+                .filter((x) => x.nombres.trim() || x.numero_documento.trim())
+                .map((x) => ({
+                  nombres: x.nombres.trim(),
+                  tipo_documento: x.tipo_documento,
+                  numero_documento: x.numero_documento.trim() || null,
+                  porcentaje: x.porcentaje === "" ? null : x.porcentaje,
+                }))
+            : [];
 
         let empresaPrep = {
           ...vaciosANull(empresa),
@@ -2772,16 +3112,16 @@ const RegistroClientePage = () => {
             ? construirOrigenFondosTexto(empresa, "") || null
             : null,
           controlada_supercias: esControlada,
+          socios_modalidad: modalidad,
           socios: sociosValidos,
-          referencia_supercias: esControlada
-            ? empresa.referencia_supercias?.trim() || null
-            : null,
-          anexo_socios_base64: esControlada
-            ? empresa.anexo_socios_base64 || null
-            : null,
-          anexo_socios_nombre: esControlada
-            ? empresa.anexo_socios_nombre || null
-            : null,
+          autoriza_consulta_supercias:
+            modalidad === "autorizacion" &&
+            !!empresa.autoriza_consulta_supercias,
+          referencia_supercias: null,
+          anexo_socios_base64:
+            modalidad === "anexo" ? empresa.anexo_socios_base64 || null : null,
+          anexo_socios_nombre:
+            modalidad === "anexo" ? empresa.anexo_socios_nombre || null : null,
         };
         empresaPrep = quitarCamposTemporales(empresaPrep, "rep_");
         empresaPrep = quitarCamposTemporales(empresaPrep, "");
@@ -2969,7 +3309,7 @@ const RegistroClientePage = () => {
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-bold text-gray-900">
-                      Condiciones Jurídicas
+                      Condiciones jurídicas, declaraciones y autorización
                     </h2>
                     <button
                       onClick={() => setModalCondiciones(false)}
@@ -2979,116 +3319,14 @@ const RegistroClientePage = () => {
                     </button>
                   </div>
                   <div className="text-sm text-gray-700 space-y-4 leading-relaxed">
-                    <p>
-                      <strong>1.-</strong> Conforme a los principios de la
-                      administración pública garantizados en el artículo 227 de
-                      la Constitución de la República que guardan relación con
-                      el principio de no duplicidad de información determinado
-                      en el artículo 3 numeral 13 de la Ley Orgánica Para La
-                      Optimización y Eficiencia de Trámites Administrativos, así
-                      como con la prohibición establecida en el artículo 11 de
-                      la referida normativa que impide a quienes prestamos un
-                      servicio público exigir a los usuarios información que ya
-                      disponemos en nuestras bases de datos, quienes hacemos
-                      esta dependencia dejamos constancia que respecto a
-                      personas naturales los datos tales como: a) Nombres y
-                      apellidos completos, b) Número de Registro Único de
-                      Contribuyentes, c) Domicilio, d) Cédula de identidad para
-                      ecuatorianos, pasaporte o documento de identificación en
-                      caso de persona extranjera, e) Actividad ocupacional y
-                      cargo, f) Sexo; y, g) Nacionalidad; así como, respecto a
-                      personas jurídicas datos tales como: a) Razón social, b)
-                      Número de Registro Único de Contribuyentes, c)
-                      Nacionalidad, d) Dirección domiciliaria, e) Provincia,
-                      ciudad, cantón; y, f) Actividad económica; y, sus
-                      representantes legales respecto con: a) Nombres y
-                      apellidos completos, b) Cédula de identidad para
-                      ecuatorianos, pasaporte o documento de identificación en
-                      caso de persona extranjera, c) Sexo, d) Nacionalidad; y,
-                      e) Escritura pública del poder respectivo constan
-                      plenamente detallados en el texto de la escritura pública
-                      y o actuación notarial cuyo número específico está en la
-                      parte superior de este formulario y además los documentos
-                      originales, copias certificadas, compulsas y
-                      materializaciones de respaldo están habilitados a dicho
-                      instrumento notarial.
-                    </p>
-                    <p>
-                      <strong>2.</strong> La información respecto al contrato o
-                      acto notarial que comprenda: a) Valor de la operación,
-                      transacción económica, acto o contratos realizados, b)
-                      Fecha de su realización, c) Moneda en la que se realizó la
-                      transacción; y, d) Ciudad y fecha de pago también constan
-                      detallados en la escritura pública o actuación notarial
-                      cuyo número específico se encuentra en la parte superior
-                      de este formulario.
-                    </p>
-                    <p>
-                      <strong>3.</strong> La información respecto al detalle de
-                      los accionistas o socios de empresas que permita obtener
-                      los datos hasta llegar a las personas naturales debe ser
-                      proporcionada por los usuarios y en la medida de lo
-                      posible podrá ser contrastada con las bases de datos de la
-                      Superintendencia de Compañías. De la misma forma, toda la
-                      información que identifique al fideicomitente, fiduciario,
-                      beneficiarios, clase de fideicomisos, hasta llegar a las
-                      personas naturales que ejerzan el control efectivo y
-                      definitivo sobre el mismo debe ser proporcionada por los
-                      usuarios del servicio.
-                    </p>
-                    <p>
-                      <strong>4.-</strong> Como persona legalmente capaz que soy
-                      manifiesto que estoy enterado(a) de todos los detalles de
-                      la negociación o pretensión que antecede a la firma de
-                      este instrumento, y en consecuencia lo realizo sin presión
-                      de ninguna naturaleza en beneficio de mis intereses.
-                      Manifiesto que he recibido explicaciones y asesoría
-                      jurídica de parte del abogado que patrocina la minuta o
-                      petición y directamente del Notario que interviene
-                      autorizando el otorgamiento de este instrumento.
-                    </p>
-                    <p>
-                      <strong>5.-</strong> Declaro que los fondos con los que se
-                      ejecuta esta negociación no provienen de actividades
-                      ilícitas ni vinculadas con la producción, consumo,
-                      comercialización de sustancias estupefacientes y
-                      psicotrópicas, ni el lavado de activos fijos, ni
-                      recolección de fondos de financiamiento de terrorismo o
-                      cualquier otra actividad tipificada en la normativa
-                      vigente ya sea relacionada con los delitos de narcotráfico
-                      u otro tipo de delitos, por lo que me hago absolutamente
-                      responsable de cualquier tipo de imputaciones que el
-                      Estado Ecuatoriano a través de sus instituciones de
-                      control ejecute como resultado de sus investigaciones,
-                      expresando con claridad que la intervención del Notario
-                      que autoriza el otorgamiento de este instrumento es
-                      únicamente de tipo legal conforme a sus facultades e
-                      investidura.
-                    </p>
-                    <p>
-                      <strong>6.-</strong> Manifiesto que tanto la persona
-                      dependiente de la Notaría Vigésimo Segunda del cantón
-                      Quito que me ha atendido, al igual que el Notario en forma
-                      personal me han explicado sobre los riesgos que existen al
-                      hacer negociaciones con personas a quienes no conozco
-                      directamente o de las que no tengo referencias, en
-                      especial cuando los contratos a otorgarse son producto de
-                      avisos publicados en la prensa o los precios están por
-                      debajo del mercado, por lo tanto sé y conozco claramente
-                      la importancia de informarme sobre los antecedentes
-                      personales de quienes han ofertado el bien que estoy
-                      adquiriendo o a quienes deseo transferirlo.
-                    </p>
-                    <p>
-                      <strong>7.-</strong> (NUMERAL APLICABLE PARA PERSONAS QUE
-                      NO SABEN LEER Y ESCRIBIR) Como persona que no sé leer y
-                      escribir, manifiesto que este documento me fue leído por
-                      el testigo de confianza por mi presentado y que recibí las
-                      explicaciones adecuadas y claras tanto del personal de la
-                      Notaría Vigésima Segunda del cantón Quito y del Notario,
-                      en consecuencia, coloco la huella digital de mi pulgar
-                      derecho al pie de este documento.
-                    </p>
+                    {CONDICIONES_JURIDICAS.map((c) => (
+                      <div key={c.numero}>
+                        <p className="font-semibold text-gray-900">
+                          {c.numero}.- {c.titulo}
+                        </p>
+                        <p className="text-justify">{c.texto}</p>
+                      </div>
+                    ))}
                   </div>
                   <button
                     onClick={() => {
@@ -3248,7 +3486,7 @@ const RegistroClientePage = () => {
                       <p className="text-sm font-medium text-blue-800">
                         {" "}
                         Como está casado/a, necesitamos también los datos de su
-                        cónyuge
+                        cónyuge.
                       </p>
                     </div>
                     <FormularioPersona
@@ -3392,7 +3630,7 @@ const RegistroClientePage = () => {
           {/* CONDICIONES JURÍDICAS */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
             <h2 className="font-semibold text-amber-900 mb-3">
-              Condiciones Jurídicas
+              Condiciones jurídicas, declaraciones y autorización
             </h2>
             <button
               type="button"
@@ -3413,8 +3651,9 @@ const RegistroClientePage = () => {
                 className="w-4 h-4 mt-0.5 rounded text-amber-600"
               />
               <span className="text-sm text-amber-800">
-                He leído y acepto las condiciones jurídicas establecidas por la
-                Notaría Vigésimo Segunda del Cantón Quito.
+                He leído y acepto las condiciones jurídicas, declaraciones y
+                autorización establecidas por la Notaría Vigésimo Segunda del
+                cantón Quito.
               </span>
             </label>
             {errors.condiciones && (

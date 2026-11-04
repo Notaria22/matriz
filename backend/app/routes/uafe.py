@@ -32,7 +32,8 @@ def _uafe_persona(decl) -> dict:
     """Bloque "uafe" de una persona, con el mismo formato que antes del refactor."""
     d = svc.serializar_declaracion(decl) if decl else {}
     campos = [
-        "actividad_economica", "empresa_trabajo", "ingreso_mensual", "origen_fondos",
+        "actividad_economica", "actividad_economica_otra", "empresa_trabajo",
+        "ingreso_mensual", "origen_fondos",
         "es_pep", "es_pep_indirecto", "pep_nombre", "pep_institucion", "pep_cargo",
         "pep_fecha_inicio", "pep_grado_relacion", "pep_relacion_tipo", "pep_ya_no_ejerce",
         "pep_fecha_fin", "situacion_patrimonial", "rol_tramite", "calidad_participacion",
@@ -153,6 +154,9 @@ def consultar_uafe(
                 "listado": d.get("socios", []),
                 "referencia_supercias": d.get("referencia_supercias"),
                 "tiene_anexo": bool(d.get("tiene_anexo")),
+                # lista | anexo | autorizacion (consulta en la web de la Superintendencia)
+                "modalidad": d.get("socios_modalidad"),
+                "autoriza_consulta_supercias": d.get("autoriza_consulta_supercias"),
             },
             "representante_legal": {
                 "cedula": rep.document_number,
