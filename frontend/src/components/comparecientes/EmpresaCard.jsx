@@ -14,7 +14,7 @@ import {
   Download,
 } from "lucide-react";
 import API_CONFIG, { apiFetch } from "../../config/api";
-import { ResumenPatrimonio } from "./SeccionUAFEForm";
+import { ResumenPatrimonio } from "./ResumenPatrimonio";
 import { etiquetaActividad } from "../../utils/actividadesEconomicas";
 
 const ROL_TRAMITE = {

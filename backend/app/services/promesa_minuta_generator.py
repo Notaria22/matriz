@@ -10,6 +10,8 @@ from ..utils.number_to_words import (
     convertir_numero_casa,
     nivel_a_palabras,
     formatear_dinero,
+    cuenta_a_letras,
+    numeros_en_texto_a_letras,
 )
 # Reutilizar funciones del generador de compraventa
 from .minuta_generator import (
@@ -499,7 +501,7 @@ def generate_promesa_minuta(data: dict, template_path: str) -> BytesIO:
                 'momento_otro': parte.get('momentoOtro', ''),
                 'es_credito': parte.get('esCreditoBancario', False),
                 'nombre_banco': parte.get('nombreBanco', ''),
-                'cuenta_destino': parte.get('cuentaDestino', ''),
+                'cuenta_destino': numeros_en_texto_a_letras(parte.get('cuentaDestino', '')),
             }
 
             if parte_data['es_cuotas']:
@@ -518,10 +520,10 @@ def generate_promesa_minuta(data: dict, template_path: str) -> BytesIO:
                 parte_data['tiene_detalle'] = True
                 parte_data['detalle'] = {
                     'banco_origen': detalle.get('bancoOrigen', ''),
-                    'cuenta_origen': detalle.get('cuentaOrigen', ''),
+                    'cuenta_origen': cuenta_a_letras(detalle.get('cuentaOrigen', '')),
                     'tipo_cuenta_origen': detalle.get('tipoCuentaOrigen', ''),
                     'banco_destino': detalle.get('bancoDestino', ''),
-                    'cuenta_destino': detalle.get('cuentaDestino', ''),
+                    'cuenta_destino': cuenta_a_letras(detalle.get('cuentaDestino', '')),
                     'tipo_cuenta_destino': detalle.get('tipoCuentaDestino', ''),
                 }
             else:

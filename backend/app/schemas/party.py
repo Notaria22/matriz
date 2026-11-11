@@ -2,6 +2,30 @@ from pydantic import BaseModel, Field, EmailStr, field_validator, model_validato
 from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
+import re
+
+
+# Número de casa: solo la numeración (E13-51, OE4-23, 333A, S/N). La referencia
+# ("atrás de SOLCA") va en su propio campo, porque el número se escribe en letras
+# en las escrituras.
+PATRON_NUMERO_CASA = re.compile(r"^(S/N|(?=.*\d)[A-Z0-9]+(?:[- ][A-Z0-9]+)*)$")
+MENSAJE_NUMERO_CASA = (
+    "Escriba solo la numeración, por ejemplo E13-51 o S/N. "
+    "Las indicaciones como \"atrás de...\" van en Referencia."
+)
+
+
+def normalizar_numero_casa(v):
+    if v is None:
+        return v
+    v = re.sub(r"\s+", " ", str(v).strip().upper())
+    if not v:
+        return None
+    if v in ("SN", "S-N", "S N", "S/N.", "SIN NUMERO", "SIN NÚMERO", "SIN NRO", "SIN NO"):
+        v = "S/N"
+    if not PATRON_NUMERO_CASA.match(v):
+        raise ValueError(MENSAJE_NUMERO_CASA)
+    return v
 
 
 class PartyBase(BaseModel):
@@ -24,6 +48,7 @@ class PartyBase(BaseModel):
     main_street: str = Field(..., min_length=2, max_length=150)
     secondary_street: str = Field(..., min_length=2, max_length=150)
     number_street: Optional[str] = Field(None, max_length=20)
+    referencia: Optional[str] = Field(None, max_length=200)
     edificio: Optional[str] = Field(None, max_length=200)
     occupation: str = Field(..., min_length=2, max_length=100)
     profession: Optional[str] = Field(None, max_length=100)
@@ -80,6 +105,11 @@ class PartyBase(BaseModel):
                 raise ValueError('Pasaporte debe tener entre 6 y 13 caracteres')
         return v.upper()
 
+    @field_validator('number_street')
+    @classmethod
+    def validate_number_street(cls, v):
+        return normalizar_numero_casa(v)
+
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v):
@@ -121,6 +151,7 @@ class PartyUpdate(BaseModel):
     main_street: Optional[str] = None
     secondary_street: Optional[str] = None
     number_street: Optional[str] = None
+    referencia: Optional[str] = None
     edificio: Optional[str] = None
     occupation: Optional[str] = None
     profession: Optional[str] = None

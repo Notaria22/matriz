@@ -3,7 +3,7 @@ import { Card } from "../shared";
 import { AlertTriangle, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import { apiFetch } from "../../config/api";
 import { useToast } from "../../hooks/useToast";
-import { ResumenPatrimonio } from "./SeccionUAFEForm";
+import { ResumenPatrimonio } from "./ResumenPatrimonio";
 import { etiquetaActividad } from "../../utils/actividadesEconomicas";
 
 const ETIQUETAS = {

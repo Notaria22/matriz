@@ -12,6 +12,9 @@ from ..utils.number_to_words import (
     formatear_dinero,
     limpiar_nombre_notario,
     formatear_referencia_notario,
+    cuenta_a_letras,
+    numero_casa_en_direccion,
+    numeros_en_texto_a_letras,
 )
 from bs4 import BeautifulSoup
 import re
@@ -66,7 +69,7 @@ def procesar_empresa_data(empresa, numero_global):
     if empresa.get('mainStreet'):
         empresa_parts.append(empresa['mainStreet'])
     if empresa.get('numberStreet'):
-        empresa_parts.append(f"número {empresa['numberStreet']}")
+        empresa_parts.append(numero_casa_en_direccion(empresa['numberStreet']))
     if empresa.get('secondaryStreet'):
         empresa_parts.append(f"y {empresa['secondaryStreet']}")
     if empresa.get('sector'):
@@ -77,14 +80,14 @@ def procesar_empresa_data(empresa, numero_global):
         empresa_parts.append(f"cantón {empresa['canton']}")
     if empresa.get('province'):
         empresa_parts.append(f"provincia de {empresa['province']}")
-    direccion_empresa = ", ".join(empresa_parts)
+    direccion_empresa = numeros_en_texto_a_letras(", ".join(empresa_parts))
 
     # Construir dirección del representante
     rep_parts = []
     if empresa.get('repMainStreet'):
         rep_parts.append(empresa['repMainStreet'])
     if empresa.get('repNumberStreet'):
-        rep_parts.append(f"número {empresa['repNumberStreet']}")
+        rep_parts.append(numero_casa_en_direccion(empresa['repNumberStreet']))
     if empresa.get('repSecondaryStreet'):
         rep_parts.append(f"y {empresa['repSecondaryStreet']}")
     if empresa.get('repSector'):
@@ -95,7 +98,7 @@ def procesar_empresa_data(empresa, numero_global):
         rep_parts.append(f"cantón {empresa['repCanton']}")
     if empresa.get('repProvince'):
         rep_parts.append(f"provincia de {empresa['repProvince']}")
-    direccion_rep = ", ".join(rep_parts)
+    direccion_rep = numeros_en_texto_a_letras(", ".join(rep_parts))
 
     # Calcular edad del representante
     edad_rep = calcular_edad(empresa.get('repBirthDate', ''))
@@ -177,7 +180,7 @@ def construir_direccion(persona):
     if persona.get('canton'): partes.append(f"cantón {persona['canton']}")
     if persona.get('province'): partes.append(f"provincia de {persona['province']}")
 
-    return ', '.join(partes)
+    return numeros_en_texto_a_letras(', '.join(partes))
 
 
 def agrupar_por_conyuges(personas):
@@ -1012,7 +1015,7 @@ def generate_minuta_compraventa(data: dict, current_user=None) -> str:
                 'es_credito': parte.get('esCreditoBancario', False),
                 'entidad_credito': parte.get('nombreBanco', ''),
                 'nombre_banco': parte.get('nombreBanco', ''),
-                'cuenta_destino': parte.get('cuentaDestino', ''),
+                'cuenta_destino': numeros_en_texto_a_letras(parte.get('cuentaDestino', '')),
                 'detalle_transferencia': '',
             }
 
@@ -1032,10 +1035,10 @@ def generate_minuta_compraventa(data: dict, current_user=None) -> str:
                 parte_data['tiene_detalle'] = True
                 parte_data['detalle'] = {
                     'banco_origen': detalle.get('bancoOrigen', ''),
-                    'cuenta_origen': detalle.get('cuentaOrigen', ''),
+                    'cuenta_origen': cuenta_a_letras(detalle.get('cuentaOrigen', '')),
                     'tipo_cuenta_origen': detalle.get('tipoCuentaOrigen', ''),
                     'banco_destino': detalle.get('bancoDestino', ''),
-                    'cuenta_destino': detalle.get('cuentaDestino', ''),
+                    'cuenta_destino': cuenta_a_letras(detalle.get('cuentaDestino', '')),
                     'tipo_cuenta_destino': detalle.get('tipoCuentaDestino', ''),
                 }
             else:

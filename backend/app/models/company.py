@@ -32,6 +32,7 @@ class Company(Base):
     main_street = Column(String(150), nullable=False)
     secondary_street = Column(String(150), nullable=False)
     number_street = Column(String(20), nullable=True)
+    referencia = Column(String(200), nullable=True)
 
     # Representante legal
     representante_id = Column(

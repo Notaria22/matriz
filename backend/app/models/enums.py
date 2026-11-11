@@ -92,12 +92,6 @@ class EstadoDatosReportados(enum.Enum):
     descartado = "descartado"
 
 
-class CargoNotarial(enum.Enum):
-    """Solo los usuarios con cargo notarial aparecen como notario en las matrices."""
-    titular = "titular"
-    suplente = "suplente"
-
-
 class EstadoRepresentacion(enum.Enum):
     pendiente = "pendiente"
     utilizada = "utilizada"

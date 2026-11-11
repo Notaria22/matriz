@@ -3,6 +3,8 @@ from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
 
+from app.schemas.party import normalizar_numero_casa
+
 
 class CompanyBase(BaseModel):
     """Schema base para empresas"""
@@ -23,6 +25,7 @@ class CompanyBase(BaseModel):
     main_street: str = Field(..., min_length=2, max_length=150)
     secondary_street: str = Field(..., min_length=2, max_length=150)
     number_street: str = Field(..., min_length=1, max_length=20)
+    referencia: Optional[str] = Field(None, max_length=200)
 
     # Representante legal
     rep_document_type: str = Field(..., pattern="^(cedula|pasaporte)$")
@@ -41,6 +44,7 @@ class CompanyBase(BaseModel):
     rep_main_street: str = Field(..., min_length=2, max_length=150)
     rep_secondary_street: str = Field(..., min_length=2, max_length=150)
     rep_number_street: str = Field(..., min_length=1, max_length=20)
+    rep_referencia: Optional[str] = Field(None, max_length=200)
     rep_occupation: str = Field(..., min_length=2, max_length=100)
     rep_profession: Optional[str] = Field(None, max_length=100)
     rep_position: str = Field(..., min_length=2, max_length=100)
@@ -103,6 +107,11 @@ class CompanyBase(BaseModel):
             raise ValueError('Código de provincia inválido en RUC')
         return v
 
+    @field_validator('number_street', 'rep_number_street')
+    @classmethod
+    def validate_number_street(cls, v):
+        return normalizar_numero_casa(v)
+
     @field_validator('phone', 'rep_phone')
     @classmethod
     def validate_phone(cls, v):
@@ -130,6 +139,7 @@ class CompanyUpdate(BaseModel):
     main_street: Optional[str] = Field(None, min_length=2, max_length=150)
     secondary_street: Optional[str] = Field(None, min_length=2, max_length=150)
     number_street: Optional[str] = Field(None, min_length=1, max_length=20)
+    referencia: Optional[str] = Field(None, max_length=200)
     rep_document_type: Optional[str] = Field(None, pattern="^(cedula|pasaporte)$")
     rep_document_number: Optional[str] = Field(None, min_length=10, max_length=13)
     rep_names: Optional[str] = Field(None, min_length=2, max_length=100)
@@ -146,6 +156,7 @@ class CompanyUpdate(BaseModel):
     rep_main_street: Optional[str] = Field(None, min_length=2, max_length=150)
     rep_secondary_street: Optional[str] = Field(None, min_length=2, max_length=150)
     rep_number_street: Optional[str] = Field(None, min_length=1, max_length=20)
+    rep_referencia: Optional[str] = Field(None, max_length=200)
     rep_occupation: Optional[str] = Field(None, min_length=2, max_length=100)
     rep_profession: Optional[str] = Field(None, max_length=100)
     rep_position: Optional[str] = Field(None, min_length=2, max_length=100)

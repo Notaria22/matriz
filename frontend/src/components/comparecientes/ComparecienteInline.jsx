@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, Button } from "../shared";
 import ComparecienteSearch from "./ComparecienteSearch";
-import ComparecienteForm from "./ComparecienteForm";
 import ComparecienteCard from "./ComparecienteCard";
 import ComparecienteOptions from "./ComparecienteOptions";
 import EmpresaCard from "./EmpresaCard";
+import RegistroInterno from "../registro/RegistroInterno";
 import { apiFetch } from "../../config/api";
 import API_CONFIG from "../../config/api";
 import { useToast } from "../../hooks/useToast";
@@ -38,19 +38,8 @@ const ComparecienteInline = ({
   const [compareciente, setCompareciente] = useState(null);
   const [opcionesEspeciales, setOpcionesEspeciales] =
     useState(INITIAL_OPCIONES);
-  const [documentoBuscado, setDocumentoBuscado] = useState(""); // para prellenar el form
-  const [tipoDocBuscado, setTipoDocBuscado] = useState("cedula"); // 'cedula' | 'pasaporte'
-
-  // Memoizado: solo cambia de referencia cuando el documento/tipo realmente cambian.
-  // Sin esto, cada re-render del padre (ej. cuando un toast desaparece) crea un
-  // objeto nuevo y resetea todo el formulario de creación.
-  const initialDataPrellenado = useMemo(
-    () =>
-      documentoBuscado
-        ? { documentNumber: documentoBuscado, documentType: tipoDocBuscado }
-        : null,
-    [documentoBuscado, tipoDocBuscado],
-  );
+  // Documento buscado y no encontrado: se usa para abrir el formulario de registro
+  const [documentoBuscado, setDocumentoBuscado] = useState("");
   const toast = useToast();
 
   // Precargar datos desde plantilla
@@ -78,9 +67,8 @@ const ComparecienteInline = ({
   };
 
   // ─── Lógica Persona Natural ──────────────────────────────────────────────
-  const handleSearchPersona = async (documentNumber, tipoDoc = "cedula") => {
+  const handleSearchPersona = async (documentNumber) => {
     setDocumentoBuscado(documentNumber);
-    setTipoDocBuscado(tipoDoc);
     setLoading(true);
     try {
       const response = await apiFetch(
@@ -100,7 +88,7 @@ const ComparecienteInline = ({
         toast.success("Compareciente encontrado");
       } else if (response.status === 404) {
         toast.info(
-          "No encontrado. Complete los datos para crear el compareciente.",
+          "No encontrado. Complete el formulario para registrar al compareciente.",
         );
         setCompareciente(null);
         setMode("create");
@@ -136,6 +124,7 @@ const ComparecienteInline = ({
 
   // ─── Lógica Empresa ──────────────────────────────────────────────────────
   const handleSearchEmpresa = async (ruc) => {
+    setDocumentoBuscado(ruc);
     setLoading(true);
     try {
       const response = await apiFetch(
@@ -150,7 +139,11 @@ const ComparecienteInline = ({
         notifyParent(empresaData, {});
         toast.success("Empresa encontrada");
       } else if (response.status === 404) {
-        toast.info("Empresa no encontrada. Verifique el RUC.");
+        toast.info(
+          "Empresa no encontrada. Complete el formulario para registrarla.",
+        );
+        setCompareciente(null);
+        setMode("create");
       } else {
         const errorData = await response.json();
         toast.error(errorData.detail || "Error al buscar empresa");
@@ -162,12 +155,33 @@ const ComparecienteInline = ({
     }
   };
 
+  const handleSuccessEmpresa = (data) => {
+    const empresaData = { ...transformToCamelCase(data), esEmpresa: true };
+    setCompareciente(empresaData);
+    setMode("selected");
+    notifyParent(empresaData, {});
+    toast.success("Empresa guardada exitosamente");
+  };
+
+  // Mismo formulario del cliente (registro interno)
+  const handleGuardado = (data) => {
+    setDocumentoBuscado("");
+    if (!data) {
+      toast.error("Se guardó, pero no se pudo cargar el registro. Búsquelo.");
+      setMode("search");
+      return;
+    }
+    if (entityType === "persona") handleSuccessPersona(data);
+    else handleSuccessEmpresa(data);
+  };
+
   // ─── Cambiar tipo ────────────────────────────────────────────────────────
   const handleSwitchType = (type) => {
     if (type === entityType) return;
     setEntityType(type);
     setMode("search");
     setCompareciente(null);
+    setDocumentoBuscado("");
     setOpcionesEspeciales(INITIAL_OPCIONES);
     if (onComparecienteReady) onComparecienteReady(null);
   };
@@ -235,40 +249,68 @@ const ComparecienteInline = ({
                 <Button
                   variant="outline"
                   icon={<PlusCircle className="w-5 h-5" />}
-                  onClick={() => setMode("create")}
+                  onClick={() => {
+                    setDocumentoBuscado("");
+                    setMode("create");
+                  }}
                 >
                   Crear Nuevo Compareciente
                 </Button>
               </div>
             </>
           ) : (
-            <ComparecienteSearch
-              onSearch={handleSearchEmpresa}
-              loading={loading}
-              mode="ruc"
-              label="Buscar por RUC"
-              placeholder="Ej: 1790012345001"
-            />
+            <>
+              <ComparecienteSearch
+                onSearch={handleSearchEmpresa}
+                loading={loading}
+                mode="ruc"
+                label="Buscar por RUC"
+                placeholder="Ej: 1790012345001"
+              />
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-2">o</p>
+                <Button
+                  variant="outline"
+                  icon={<PlusCircle className="w-5 h-5" />}
+                  onClick={() => {
+                    setDocumentoBuscado("");
+                    setMode("create");
+                  }}
+                >
+                  Registrar Nueva Empresa
+                </Button>
+              </div>
+            </>
           )}
         </div>
       )}
 
-      {/* MODO CREAR (solo persona natural) */}
-      {mode === "create" && isPersona && (
-        <ComparecienteForm
-          initialData={initialDataPrellenado}
-          onSuccess={handleSuccessPersona}
-          onCancel={() => setMode("search")}
+      {/* MODO CREAR: mismo formulario que llena el cliente */}
+      {mode === "create" && (
+        <RegistroInterno
+          key={`nuevo-${entityType}-${documentoBuscado}`}
+          tipo={entityType}
+          modo="nuevo"
+          documento={documentoBuscado}
+          onGuardado={handleGuardado}
+          onCancelar={() => setMode("search")}
+          onActualizar={(doc) =>
+            isPersona ? handleSearchPersona(doc) : handleSearchEmpresa(doc)
+          }
         />
       )}
 
-      {/* MODO EDITAR (solo persona natural) */}
-      {mode === "edit" && isPersona && (
-        <ComparecienteForm
-          initialData={compareciente}
-          isEditing={true}
-          onSuccess={handleSuccessPersona}
-          onCancel={handleCancelEdit}
+      {/* MODO ACTUALIZAR: identidad precargada, parte UAFE vacía */}
+      {mode === "edit" && compareciente && (
+        <RegistroInterno
+          key={`actualizar-${entityType}`}
+          tipo={entityType}
+          modo="actualizar"
+          documento={
+            isPersona ? compareciente.documentNumber : compareciente.ruc
+          }
+          onGuardado={handleGuardado}
+          onCancelar={handleCancelEdit}
         />
       )}
 
@@ -297,7 +339,7 @@ const ComparecienteInline = ({
                   icon={<Edit className="w-5 h-5" />}
                   onClick={handleEdit}
                 >
-                  Editar
+                  Actualizar
                 </Button>
                 <Button variant="outline" onClick={handleChange}>
                   Cambiar Compareciente
@@ -308,6 +350,13 @@ const ComparecienteInline = ({
             <>
               <EmpresaCard data={compareciente} />
               <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  icon={<Edit className="w-5 h-5" />}
+                  onClick={handleEdit}
+                >
+                  Actualizar
+                </Button>
                 <Button variant="outline" onClick={handleChange}>
                   Cambiar Empresa
                 </Button>

@@ -9,8 +9,6 @@ class SystemUserCreate(BaseModel):
     password: str = Field(..., min_length=6, description="Contraseña (mínimo 6 caracteres)")
     rol: str = Field(..., pattern="^(admin|notaria|lexdata)$", description="Rol del usuario")
     iniciales: Optional[str] = Field(None, max_length=10, description="Iniciales del usuario")  # 🔥 NUEVO
-    cargo_notarial: Optional[str] = Field(None, pattern="^(titular|suplente)$")
-    genero: Optional[str] = Field(None, pattern="^(masculino|femenino)$")
     
     @field_validator('username')
     @classmethod
@@ -26,9 +24,6 @@ class SystemUserUpdate(BaseModel):
     rol: Optional[str] = Field(None, pattern="^(admin|notaria|lexdata)$")
     iniciales: Optional[str] = Field(None, max_length=10)  # 🔥 NUEVO
     activo: Optional[bool] = None
-    # "" quita el cargo notarial
-    cargo_notarial: Optional[str] = Field(None, pattern="^(titular|suplente|)$")
-    genero: Optional[str] = Field(None, pattern="^(masculino|femenino|)$")
 
 # Schema para respuesta (sin password)
 class SystemUserResponse(BaseModel):
@@ -37,28 +32,12 @@ class SystemUserResponse(BaseModel):
     username: str
     rol: str
     iniciales: Optional[str] = None  # 🔥 NUEVO
-    cargo_notarial: Optional[str] = None
-    genero: Optional[str] = None
     activo: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    @field_validator("rol", "cargo_notarial", "genero", mode="before")
-    @classmethod
-    def enum_a_texto(cls, v):
-        return v.value if hasattr(v, "value") else v
-
     class Config:
         from_attributes = True
-
-
-class NotarioResponse(BaseModel):
-    """Opción del selector de notario en matrices y poderes."""
-    id: int
-    nombre: str
-    titulo: str
-    cargo: str
-    genero: str
 
 # Schema para login
 class LoginRequest(BaseModel):

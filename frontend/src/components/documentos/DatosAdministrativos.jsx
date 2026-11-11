@@ -1,15 +1,26 @@
 import { useState, useEffect } from "react";
 import { Card, FormField } from "../shared";
 import { useAuth } from "../../context/AuthContext";
-import { apiFetch } from "../../config/api";
 
-// Los notarios (titular y suplente) vienen de Gestión de Usuarios:
-// si cambia el suplente, se cambia ahí y no en el código.
+// Notarios de la notaría. Si cambia el suplente, se cambia aquí.
+// suplente: true → se pide el número de acción de personal.
+const NOTARIOS = {
+  "alex-mejia": {
+    nombre: "ALEX DAVID MEJÍA VITERI",
+    titulo: "Notario Público Vigésimo Segundo del Cantón Quito",
+    suplente: false,
+  },
+  "christian-yandun": {
+    nombre: "CHRISTIAN ERNESTO YANDÚN TORRES",
+    titulo: "Notario Público Suplente Vigésimo Segundo del Cantón Quito",
+    suplente: true,
+  },
+};
 
 const TIPOS_CONTRATO = {
   compraventa: "Compraventa",
   promesa_compraventa: "Promesa de Compraventa",
-  sesion: "Sesión",
+  cesion: "Cesión",
   donacion: "Donación",
 };
 
@@ -19,6 +30,7 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
 
   const [formData, setFormData] = useState({
     notarioKey: "",
+    accionPersonal: "",
     matrizador: user?.iniciales || "",
     numeroProtocolo: "",
     tipoContrato: tipoContrato,
@@ -32,34 +44,18 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
   });
 
   const [errors, setErrors] = useState({});
-  const [notarios, setNotarios] = useState([]);
-  const [errorNotarios, setErrorNotarios] = useState("");
 
   useEffect(() => {
-    let activo = true;
-    apiFetch("/api/system-users/notarios")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((lista) => {
-        if (!activo) return;
-        setNotarios(lista);
-        if (lista.length === 0)
-          setErrorNotarios(
-            "No hay notarios configurados. Un administrador debe marcar al titular y al suplente en Gestión de Usuarios.",
-          );
-      })
-      .catch(
-        () =>
-          activo && setErrorNotarios("No se pudo cargar la lista de notarios."),
-      );
-    return () => {
-      activo = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const elegido = notarios.find((n) => String(n.id) === formData.notarioKey);
+    const elegido = NOTARIOS[formData.notarioKey];
     const notario = elegido
-      ? { nombre: elegido.nombre, titulo: elegido.titulo }
+      ? {
+          nombre: elegido.nombre,
+          titulo: elegido.titulo,
+          suplente: elegido.suplente,
+          accionPersonal: elegido.suplente
+            ? formData.accionPersonal.trim()
+            : "",
+        }
       : null;
 
     if (onChange) {
@@ -69,7 +65,7 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
         needsConcuerdo: showConcuerdo,
       });
     }
-  }, [formData, showConcuerdo, onChange, notarios]);
+  }, [formData, showConcuerdo, onChange]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -101,11 +97,7 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
     <Card title="Datos Administrativos">
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            label="Notario"
-            required
-            error={errors.notarioKey || errorNotarios}
-          >
+          <FormField label="Notario" required error={errors.notarioKey}>
             <select
               name="notarioKey"
               value={formData.notarioKey}
@@ -113,13 +105,31 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
               className="input-field"
             >
               <option value="">Seleccione un notario</option>
-              {notarios.map((n) => (
-                <option key={n.id} value={String(n.id)}>
-                  {n.nombre} ({n.cargo === "titular" ? "titular" : "suplente"})
+              {Object.entries(NOTARIOS).map(([key, n]) => (
+                <option key={key} value={key}>
+                  {n.nombre} ({n.suplente ? "suplente" : "titular"})
                 </option>
               ))}
             </select>
           </FormField>
+
+          {NOTARIOS[formData.notarioKey]?.suplente && (
+            <FormField
+              label="Número de acción de personal"
+              required
+              hint="Aparece en la matriz junto al nombre del notario suplente."
+            >
+              <input
+                type="text"
+                name="accionPersonal"
+                value={formData.accionPersonal}
+                onChange={handleChange}
+                className="input-field"
+                placeholder="Ej: AP-2026-0123"
+                maxLength={100}
+              />
+            </FormField>
+          )}
 
           <FormField label="Matrizador">
             <input

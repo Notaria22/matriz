@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../components/shared";
 import ComparecienteSearch from "../components/comparecientes/ComparecienteSearch";
-import ComparecienteForm from "../components/comparecientes/ComparecienteForm";
 import ComparecienteCard from "../components/comparecientes/ComparecienteCard";
-import EmpresaForm from "../components/comparecientes/EmpresaForm";
 import EmpresaCard from "../components/comparecientes/EmpresaCard";
+import RegistroInterno from "../components/registro/RegistroInterno";
+import VistaRegistro from "../components/registro/VistaRegistro";
 import HistorialUAFE from "../components/comparecientes/HistorialUAFE";
 import { apiFetch } from "../config/api";
 import API_CONFIG from "../config/api";
 import { useToast } from "../hooks/useToast";
 import { transformToCamelCase } from "../utils/transformPartyData";
-import { Plus, Edit, ArrowLeft, User, Building2 } from "lucide-react";
+import { Plus, Edit, ArrowLeft, User, Building2, Printer } from "lucide-react";
 
 const ComparecientesPage = () => {
   // 'persona' | 'empresa'
@@ -21,6 +21,10 @@ const ComparecientesPage = () => {
   const [loading, setLoading] = useState(false);
   const [currentPersona, setCurrentPersona] = useState(null);
   const [currentEmpresa, setCurrentEmpresa] = useState(null);
+  // Documento a actualizar cuando se llega desde "Nuevo" (ya registrado)
+  const [documentoEditar, setDocumentoEditar] = useState("");
+  // Último formulario llenado (se muestra en el orden del formulario)
+  const [registroVigente, setRegistroVigente] = useState(null);
   const toast = useToast();
 
   // ─── Helpers de navegación ───────────────────────────────────────────────
@@ -37,6 +41,32 @@ const ComparecientesPage = () => {
     setCurrentPersona(null);
     setCurrentEmpresa(null);
   };
+
+  const documentoActual =
+    entityType === "persona"
+      ? currentPersona?.documentNumber
+      : currentEmpresa?.ruc;
+
+  useEffect(() => {
+    if (view !== "view" || !documentoActual) return;
+    let cancelado = false;
+    setRegistroVigente(null);
+    apiFetch(
+      `/api/registro/vigente/${entityType}/${encodeURIComponent(documentoActual)}`,
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => !cancelado && setRegistroVigente(data))
+      .catch(() => !cancelado && setRegistroVigente(null));
+    return () => {
+      cancelado = true;
+    };
+  }, [view, entityType, documentoActual]);
+
+  const imprimir = () =>
+    window.open(
+      `/comparecientes/imprimir/${entityType}/${encodeURIComponent(documentoActual)}`,
+      "_blank",
+    );
 
   // ─── Lógica Persona Natural ──────────────────────────────────────────────
   const handleSearchPersona = async (documentNumber) => {
@@ -180,7 +210,10 @@ const ComparecientesPage = () => {
                     • Busque un compareciente existente por número de cédula
                   </li>
                   <li>• Si no existe, podrá crear uno nuevo</li>
-                  <li>• Puede editar los datos de comparecientes existentes</li>
+                  <li>
+                    • "Actualizar" abre el formulario completo y crea una
+                    declaración nueva
+                  </li>
                 </ul>
               </div>
             </>
@@ -201,8 +234,8 @@ const ComparecientesPage = () => {
                   <li>• Busque una empresa existente por RUC</li>
                   <li>• Si no existe, podrá registrar una nueva</li>
                   <li>
-                    • El representante legal debe estar registrado como
-                    compareciente
+                    • Con "Nueva Empresa" se registra también al representante
+                    legal
                   </li>
                 </ul>
               </div>
@@ -211,51 +244,71 @@ const ComparecientesPage = () => {
         </div>
       )}
 
-      {/* ── CREAR ── */}
-      {view === "create" &&
-        (isPersona ? (
-          <ComparecienteForm
-            onSuccess={handlePersonaSuccess}
-            onCancel={() => setView("search")}
-          />
-        ) : (
-          <EmpresaForm
-            onSuccess={handleEmpresaSuccess}
-            onCancel={() => setView("search")}
-          />
-        ))}
+      {/* ── NUEVO (mismo formulario del cliente) ── */}
+      {view === "create" && (
+        <RegistroInterno
+          key={`nuevo-${entityType}`}
+          tipo={entityType}
+          modo="nuevo"
+          onGuardado={(data) => {
+            toast.success("Datos registrados correctamente");
+            if (isPersona) handlePersonaSuccess(data);
+            else handleEmpresaSuccess(data);
+          }}
+          onCancelar={() => setView("search")}
+          onActualizar={(doc) => {
+            setDocumentoEditar(doc);
+            setView("edit");
+          }}
+        />
+      )}
 
-      {/* ── EDITAR ── */}
-      {view === "edit" &&
-        (isPersona ? (
-          <ComparecienteForm
-            initialData={currentPersona}
-            isEditing={true}
-            onSuccess={handlePersonaSuccess}
-            onCancel={() => setView("view")}
-          />
-        ) : (
-          <EmpresaForm
-            initialData={currentEmpresa}
-            onSuccess={handleEmpresaSuccess}
-            onCancel={() => setView("view")}
-          />
-        ))}
+      {/* ── ACTUALIZAR: identidad precargada, parte UAFE vacía ── */}
+      {view === "edit" && (
+        <RegistroInterno
+          key={`actualizar-${entityType}-${documentoEditar || documentoActual}`}
+          tipo={entityType}
+          modo="actualizar"
+          documento={documentoEditar || documentoActual}
+          onGuardado={(data) => {
+            toast.success("Datos actualizados correctamente");
+            setDocumentoEditar("");
+            if (isPersona) handlePersonaSuccess(data);
+            else handleEmpresaSuccess(data);
+          }}
+          onCancelar={() => {
+            const veniaDeNuevo = !!documentoEditar;
+            setDocumentoEditar("");
+            setView(veniaDeNuevo || !currentItem ? "search" : "view");
+          }}
+        />
+      )}
 
       {/* ── VER ── */}
       {view === "view" && currentItem && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            {registroVigente && (
+              <Button
+                variant="secondary"
+                icon={<Printer className="w-5 h-5" />}
+                onClick={imprimir}
+              >
+                Imprimir declaración
+              </Button>
+            )}
             <Button
               variant="primary"
               icon={<Edit className="w-5 h-5" />}
               onClick={() => setView("edit")}
             >
-              {isPersona ? "Editar Compareciente" : "Editar Empresa"}
+              {isPersona ? "Actualizar Compareciente" : "Actualizar Empresa"}
             </Button>
           </div>
 
-          {isPersona ? (
+          {registroVigente ? (
+            <VistaRegistro registro={registroVigente} />
+          ) : isPersona ? (
             <ComparecienteCard data={currentPersona} showPartner={true} />
           ) : (
             <EmpresaCard data={currentEmpresa} />

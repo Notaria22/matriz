@@ -5,12 +5,13 @@ import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import GestionUsuariosPage from "./pages/GestionUsuariosPage";
 import ComparecientesPage from "./pages/ComparecientesPage";
+import ImprimirDeclaracionPage from "./pages/ImprimirDeclaracionPage";
 import { useAuth } from "./context/AuthContext";
 import TestInlinePage from "./pages/TestInlinePage";
 import MatricesIndexPage from "./pages/matrices/MatricesIndexPage";
 import FormularioMatrizCompraventa from "./pages/matrices/compraventa/FormularioCompraventa";
 import FormularioMatrizPromesa from "./pages/matrices/promesa/FormularioPromesa";
-import FormularioMatrizSesion from "./pages/matrices/sesion/FormularioSesion";
+import FormularioMatrizCesion from "./pages/matrices/cesion/FormularioCesion";
 import FormularioMatrizDonacion from "./pages/matrices/donacion/FormularioDonacion";
 import MinutasIndexPage from "./pages/minutas/MinutasIndexPage";
 import FormularioCompraventa from "./pages/minutas/compraventa/FormularioCompraventa";
@@ -77,6 +78,15 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Declaración para imprimir y firmar (sin menú) */}
+        <Route
+          path="/comparecientes/imprimir/:tipo/:documento"
+          element={
+            <ProtectedRoute>
+              <ImprimirDeclaracionPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/test-inline"
           element={
@@ -135,11 +145,11 @@ function App() {
           }
         />
         <Route
-          path="/matrices/sesion"
+          path="/matrices/cesion"
           element={
             <ProtectedRoute>
               <MainLayout>
-                <FormularioMatrizSesion />
+                <FormularioMatrizCesion />
               </MainLayout>
             </ProtectedRoute>
           }

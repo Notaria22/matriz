@@ -423,6 +423,8 @@ def convertir_numero_casa(numero_str):
         return ''
     s = str(numero_str).strip()
     s_upper = s.upper()  # siempre mayúsculas en el texto
+    if s_upper.replace(' ', '') in ('S/N', 'SN', 'S-N'):
+        return 'sin número'
 
     # Patrón: letra(s) + número + guión + número (ej: E13-51, Oe4-23)
     match_guion = re.match(r'^([A-Za-z]+)(\d+)-(\d+)$', s)
@@ -459,8 +461,9 @@ def convertir_numero_casa(numero_str):
     if re.match(r'^\d+([\s,]+[yY]\s+\d+|[\s,]+\d+)*$', s):
         return re.sub(r'\d+', lambda m: f"{numero_a_letras(int(m.group(0)))} ({m.group(0)})", s)
 
-    # Sin patrón reconocido — devolver en mayúsculas tal cual
-    return s_upper
+    # Cualquier otra combinación (OE4-23A, N52-15 Y 2, ...): letra por letra y
+    # número por número
+    return codigo_a_letras(s)
 
 
 def nivel_a_palabras(nivel_str):
@@ -584,3 +587,84 @@ def formatear_dinero(monto):
         return f"{palabras} DÓLARES DE LOS ESTADOS UNIDOS DE AMÉRICA (${num_fmt} USD)"
     except (ValueError, TypeError):
         return str(monto)
+
+# ---------------------------------------------------------------------------
+# Números dentro de códigos y textos (acción de personal, matrícula, cuentas,
+# calles): en las escrituras todo número se escribe en letras.
+# ---------------------------------------------------------------------------
+
+def numero_casa_en_direccion(numero_str) -> str:
+    """'E13-51' -> 'número E trece guión ... (E13-51)'; 'S/N' -> 'sin número'."""
+    texto = convertir_numero_casa(numero_str)
+    return texto if texto == 'sin número' else f"número {texto}"
+
+
+def _grupo_digitos_a_letras(digitos: str) -> str:
+    """'0457' -> 'cero cuatrocientos cincuenta y siete' (los ceros a la izquierda se leen)."""
+    sin_ceros = digitos.lstrip('0')
+    ceros = len(digitos) - len(sin_ceros)
+    partes = ['cero'] * ceros
+    if sin_ceros:
+        partes.append(numero_a_letras(int(sin_ceros)))
+    return ' '.join(partes)
+
+
+_SIGNOS = {'-': 'guión', '/': 'barra', '.': 'punto'}
+
+
+def codigo_a_letras(codigo) -> str:
+    """
+    Código con letras y números, en letras y con el original entre paréntesis.
+    Ej: 'AP-2026-0457' -> 'AP guión dos mil veintiséis guión cero cuatrocientos
+        cincuenta y siete (AP-2026-0457)'
+        '17-2010-123'  -> 'diecisiete guión dos mil diez guión ciento veintitrés (17-2010-123)'
+    Si no tiene números se devuelve tal cual.
+    """
+    if codigo is None:
+        return ''
+    s = str(codigo).strip()
+    if not s or not re.search(r'\d', s):
+        return s
+    palabras = []
+    for tok in re.findall(r'\d+|[^\W\d_]+|[-/.]|\S', s):
+        if tok.isdigit():
+            palabras.append(_grupo_digitos_a_letras(tok))
+        elif tok in _SIGNOS:
+            palabras.append(_SIGNOS[tok])
+        elif tok.isalpha():
+            palabras.append(tok.upper())
+        else:
+            palabras.append(tok)
+    return f"{' '.join(palabras)} ({s.upper()})"
+
+
+def cuenta_a_letras(numero) -> str:
+    """Número de cuenta, dígito por dígito como la cédula: 'cero dos uno ... (021...)'."""
+    if numero is None:
+        return ''
+    s = str(numero).strip()
+    if not s or not re.search(r'\d', s):
+        return s
+    if re.fullmatch(r'[\d\s-]+', s):
+        solo_digitos = re.sub(r'\D', '', s)
+        return f"{numero_a_digitos(solo_digitos)} ({s})"
+    return codigo_a_letras(s)
+
+
+def numeros_en_texto_a_letras(texto) -> str:
+    """
+    Convierte a letras los números sueltos de un texto libre (nombres de calles,
+    sector, referencia). No toca lo que está entre paréntesis, que ya es el
+    original de algo convertido.
+    Ej: 'Av. 10 de Agosto' -> 'Av. diez de Agosto'; 'calle N52' -> 'calle N cincuenta y dos'
+    """
+    if not texto:
+        return texto or ''
+    partes = re.split(r'(\([^)]*\))', str(texto))
+    for i, parte in enumerate(partes):
+        if parte.startswith('('):
+            continue
+        parte = re.sub(r'(?<=[^\W\d_])(?=\d)', ' ', parte)
+        parte = re.sub(r'(?<=\d)(?=[^\W\d_])', ' ', parte)
+        partes[i] = re.sub(r'\d+', lambda m: _grupo_digitos_a_letras(m.group(0)), parte)
+    return ''.join(partes)

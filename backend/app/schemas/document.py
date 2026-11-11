@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 
@@ -14,6 +14,8 @@ class LawyerData(BaseModel):
 class NotarioData(BaseModel):
     nombre: str
     titulo: str
+    # Número de acción de personal (texto libre): obligatorio para el notario suplente
+    accion_personal: Optional[str] = Field(None, max_length=100)
 
 
 class ConcuerdoData(BaseModel):
@@ -115,7 +117,7 @@ class GenerateMatrizRequest(BaseModel):
     # Promesa de compraventa
     promitentes_vendedores_list: Optional[List[Dict[str, Any]]] = []
     promitentes_compradores_list: Optional[List[Dict[str, Any]]] = []
-    # Sesión
+    # Cesión
     cedentes_list: Optional[List[Dict[str, Any]]] = []
     cesionarios_list: Optional[List[Dict[str, Any]]] = []
     # Donación

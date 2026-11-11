@@ -16,6 +16,7 @@ class Document(Base):
     generated_by = Column(Integer, ForeignKey("system_users.id"), nullable=False, index=True)
 
     notario = Column(String(200), nullable=True)
+    accion_personal = Column(String(100), nullable=True)  # solo si firmó el notario suplente
     matrizador = Column(String(100), nullable=True)
 
     # Foto de las partes tal como se usaron en el documento

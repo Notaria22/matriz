@@ -17,8 +17,6 @@ const GestionUsuariosPage = () => {
     password: "",
     rol: "notaria",
     iniciales: "",
-    cargoNotarial: "",
-    genero: "",
     activo: true,
   });
   const [errors, setErrors] = useState({});
@@ -56,8 +54,6 @@ const GestionUsuariosPage = () => {
         password: "",
         rol: user.rol,
         iniciales: user.iniciales || "",
-        cargoNotarial: user.cargo_notarial || "",
-        genero: user.genero || "",
         activo: user.activo,
       });
     } else {
@@ -68,8 +64,6 @@ const GestionUsuariosPage = () => {
         password: "",
         rol: "notaria",
         iniciales: "",
-        cargoNotarial: "",
-        genero: "",
         activo: true,
       });
     }
@@ -87,8 +81,6 @@ const GestionUsuariosPage = () => {
       password: "",
       rol: "notaria",
       iniciales: "",
-      cargoNotarial: "",
-      genero: "",
       activo: true,
     });
     setErrors({});
@@ -112,10 +104,6 @@ const GestionUsuariosPage = () => {
       newErrors.password = "La contraseña es requerida";
     }
 
-    if (formData.cargoNotarial && !formData.genero) {
-      newErrors.genero = "Indique el género del notario";
-    }
-
     if (formData.password && formData.password.length < 6) {
       newErrors.password = "La contraseña debe tener al menos 6 caracteres";
     }
@@ -137,13 +125,6 @@ const GestionUsuariosPage = () => {
         username: formData.username.trim().toLowerCase(),
         rol: formData.rol,
         iniciales: formData.iniciales.trim() || null,
-        // "" quita el cargo notarial al editar
-        cargo_notarial: formData.cargoNotarial || (editingUser ? "" : null),
-        genero: formData.cargoNotarial
-          ? formData.genero
-          : editingUser
-            ? ""
-            : null,
       };
 
       if (editingUser) {
@@ -300,17 +281,6 @@ const GestionUsuariosPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getRoleBadge(user.rol)}
-                      {user.cargo_notarial && (
-                        <span className="ml-2 px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                          {user.cargo_notarial === "titular"
-                            ? user.genero === "femenino"
-                              ? "Notaria titular"
-                              : "Notario titular"
-                            : user.genero === "femenino"
-                              ? "Notaria suplente"
-                              : "Notario suplente"}
-                        </span>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -453,44 +423,6 @@ const GestionUsuariosPage = () => {
               maxLength="10"
             />
           </FormField>
-
-          <FormField
-            label="Cargo notarial"
-            hint="Solo para el notario titular y el suplente: aparecen como opción de notario al generar matrices y poderes."
-          >
-            <select
-              value={formData.cargoNotarial}
-              onChange={(e) =>
-                setFormData({ ...formData, cargoNotarial: e.target.value })
-              }
-              className="input-field"
-            >
-              <option value="">No es notario</option>
-              <option value="titular">Notario titular</option>
-              <option value="suplente">Notario suplente</option>
-            </select>
-          </FormField>
-
-          {formData.cargoNotarial && (
-            <FormField
-              label="Género"
-              required
-              error={errors.genero}
-              hint="Para los tratamientos en la escritura (Notario / Notaria)."
-            >
-              <select
-                value={formData.genero}
-                onChange={(e) =>
-                  setFormData({ ...formData, genero: e.target.value })
-                }
-                className="input-field"
-              >
-                <option value="">Seleccione</option>
-                <option value="masculino">Masculino</option>
-                <option value="femenino">Femenino</option>
-              </select>
-            </FormField>
-          )}
 
           {editingUser && (
             <FormField label="Estado">

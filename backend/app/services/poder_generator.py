@@ -11,6 +11,7 @@ from ..utils.number_to_words import (
     calcular_edad,
     numero_a_ordinal_notaria,
     convertir_numero_casa,
+    numeros_en_texto_a_letras,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def construir_direccion_poder(persona):
     if persona.get('canton'): partes.append(f"cantón {persona['canton']}")
     if persona.get('province'): partes.append(f"provincia de {persona['province']}")
 
-    return ', '.join(partes)
+    return numeros_en_texto_a_letras(', '.join(partes))
 
 
 def procesar_compareciente_poder(persona, numero, es_apoderado=False):

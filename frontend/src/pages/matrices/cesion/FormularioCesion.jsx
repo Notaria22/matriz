@@ -1,9 +1,9 @@
 import FormularioMatrizBase from "../FormularioMatrizBase";
 
-const FormularioSesion = () => (
+const FormularioCesion = () => (
   <FormularioMatrizBase
-    titulo="Generar Matriz de Sesión"
-    tipoContrato="sesion"
+    titulo="Generar Matriz de Cesión"
+    tipoContrato="cesion"
     labelParte1="Cedente"
     labelParte1Plural="Cedentes"
     labelParte2="Cesionario"
@@ -13,4 +13,4 @@ const FormularioSesion = () => (
   />
 );
 
-export default FormularioSesion;
+export default FormularioCesion;

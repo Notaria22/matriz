@@ -78,6 +78,10 @@ class DeclaracionUAFE(Base):
         nullable=True,
     )
     fecha = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Envío del formulario que originó esta declaración (para mostrarlo e imprimirlo)
+    registro_id = Column(
+        String(36), ForeignKey("registros.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # Participación en el trámite
     rol_tramite = Column(enum_column_type(RolTramite, "rol_tramite"), nullable=True)

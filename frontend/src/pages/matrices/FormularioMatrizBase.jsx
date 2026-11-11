@@ -15,19 +15,6 @@ import { useToast } from "../../hooks/useToast";
 import { apiFetch } from "../../config/api";
 import API_CONFIG from "../../config/api";
 
-/**
- * Componente genérico para formularios de matriz.
- *
- * Props de configuración:
- * - titulo: título de la página (ej: "Generar Matriz de Donación")
- * - tipoContrato: clave del contrato (ej: "donacion")
- * - labelParte1: etiqueta de la primera parte (ej: "Donante")
- * - labelParte1Plural: plural (ej: "Donantes")
- * - labelParte2: etiqueta de la segunda parte (ej: "Donatario")
- * - labelParte2Plural: plural (ej: "Donatarios")
- * - keyParte1: clave para el payload (ej: "donantes")
- * - keyParte2: clave para el payload (ej: "donatarios")
- */
 const FormularioMatrizBase = ({
   titulo,
   tipoContrato,
@@ -77,6 +64,13 @@ const FormularioMatrizBase = ({
   const validateForm = () => {
     const errors = [];
     if (!datosAdministrativos?.notarioKey) errors.push("Seleccione un notario");
+    else if (
+      datosAdministrativos.notario?.suplente &&
+      !datosAdministrativos.notario.accionPersonal
+    )
+      errors.push(
+        "Ingrese el número de acción de personal del notario suplente",
+      );
     if (!datosAdministrativos?.matrizador)
       errors.push("Configure las iniciales del matrizador en su perfil");
     if (!datosAdministrativos?.numeroProtocolo)
@@ -223,6 +217,7 @@ const FormularioMatrizBase = ({
         notario: {
           nombre: datosAdministrativos.notario.nombre,
           titulo: datosAdministrativos.notario.titulo,
+          accion_personal: datosAdministrativos.notario.accionPersonal || null,
         },
         matrizador: datosAdministrativos.matrizador,
         needs_concuerdo: datosAdministrativos.needsConcuerdo || false,

@@ -26,7 +26,7 @@ TIPO_CONTRATO_CONFIG = {
         "label_parte1": "la parte promitente vendedora",
         "label_parte2": "la parte promitente compradora",
     },
-    "sesion": {
+    "cesion": {
         "key_parte1": "cedentes_list",
         "key_parte2": "cesionarios_list",
         "label_parte1": "la parte cedente",
@@ -40,6 +40,15 @@ TIPO_CONTRATO_CONFIG = {
     },
 }
 
+# Cómo se escribe el tipo de contrato dentro de la escritura
+NOMBRE_CONTRATO = {
+    "compraventa": "COMPRAVENTA",
+    "promesa_compraventa": "PROMESA DE COMPRAVENTA",
+    "cesion": "CESIÓN",
+    "donacion": "DONACIÓN",
+}
+
+
 @router.post("/generate-matriz", response_model=GenerateMatrizResponse)
 def generate_matriz(
     request: GenerateMatrizRequest,
@@ -47,16 +56,24 @@ def generate_matriz(
     current_user: SystemUser = Depends(get_current_user)
 ):
     """
-    Genera matriz — compraventa, promesa de compraventa, sesión o donación.
+    Genera matriz — compraventa, promesa de compraventa, cesión o donación.
     """
     try:
         tipo = request.tipo_contrato.lower()
 
-        TIPOS_VALIDOS = {"compraventa", "promesa_compraventa", "sesion", "donacion"}
+        TIPOS_VALIDOS = {"compraventa", "promesa_compraventa", "cesion", "donacion"}
         if tipo not in TIPOS_VALIDOS:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Tipo de contrato '{tipo}' no válido. Valores permitidos: {', '.join(TIPOS_VALIDOS)}"
+            )
+
+        # El notario suplente firma con su número de acción de personal
+        accion_personal = (request.notario.accion_personal or "").strip() or None
+        if "suplente" in (request.notario.titulo or "").lower() and not accion_personal:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ingrese el número de acción de personal del notario suplente",
             )
 
         config = TIPO_CONTRATO_CONFIG.get(tipo)
@@ -65,18 +82,20 @@ def generate_matriz(
         partes_map = {
             "compraventa": (request.vendedores_list, request.compradores_list),
             "promesa_compraventa": (request.promitentes_vendedores_list, request.promitentes_compradores_list),
-            "sesion": (request.cedentes_list, request.cesionarios_list),
+            "cesion": (request.cedentes_list, request.cesionarios_list),
             "donacion": (request.donantes_list, request.donatarios_list),
         }
         parte1_list, parte2_list = partes_map.get(tipo, (request.vendedores_list, request.compradores_list))
 
         datos_para_docx = {
             "numeroProtocolo": request.numero_protocolo,
-            "tipoContrato": tipo.upper(),
+            "tipoContrato": NOMBRE_CONTRATO.get(tipo, tipo.upper()),
             "cuantia": request.cuantia,
             "fechaActual": request.fecha_escritura,
             "notario": request.notario.nombre,
             "tituloNotario": request.notario.titulo,
+            # Solo cuando la matriz sale a nombre del notario suplente
+            "accionPersonal": accion_personal,
             "matrizador": request.matrizador,
             "isAnyTerceraEdad": request.is_any_tercera_edad,
             "needsConcuerdo": request.needs_concuerdo,
@@ -100,7 +119,7 @@ def generate_matriz(
         TEMPLATE_MAP = {
             "compraventa": "compraventa.docx",
             "promesa_compraventa": "promesa_compraventa.docx",
-            "sesion": "sesion.docx",
+            "cesion": "cesion.docx",
             "donacion": "donacion.docx",
         }
         template_name = TEMPLATE_MAP.get(tipo, "compraventa.docx")
@@ -117,6 +136,7 @@ def generate_matriz(
             amount=request.cuantia,
             generated_by=current_user.id,
             notario=request.notario.nombre,
+            accion_personal=accion_personal,
             matrizador=request.matrizador,
             parties_data={
                 "parte1": [identificador(v) for v in parte1_list],

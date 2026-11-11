@@ -35,7 +35,7 @@ PARTY_IDENTIDAD = [
     "document_type", "document_number", "names", "last_names", "gender",
     "marital_status", "nationality", "birth_date", "email", "phone",
     "province", "canton", "parroquia", "sector", "main_street",
-    "secondary_street", "number_street", "edificio", "occupation", "profession",
+    "secondary_street", "number_street", "referencia", "edificio", "occupation", "profession",
 ]
 
 UAFE_PERSONA = [
@@ -48,7 +48,7 @@ UAFE_PERSONA = [
 
 COMPANY_IDENTIDAD = [
     "ruc", "razon_social", "email", "phone", "province", "canton", "parroquia",
-    "sector", "main_street", "secondary_street", "number_street",
+    "sector", "main_street", "secondary_street", "number_street", "referencia",
 ]
 
 UAFE_EMPRESA = [
@@ -202,6 +202,7 @@ def crear_declaracion(
     token_id: Optional[int] = None,
     declaracion_empresa: Optional[DeclaracionUAFE] = None,
     datos_reportados: Optional[dict] = None,
+    registro_id: Optional[str] = None,
 ) -> DeclaracionUAFE:
     decl = DeclaracionUAFE(
         tipo_sujeto=TipoSujeto.persona if party is not None else TipoSujeto.empresa,
@@ -211,6 +212,7 @@ def crear_declaracion(
         registrado_por=usuario_id,
         registration_token_id=token_id,
         declaracion_empresa=declaracion_empresa,
+        registro_id=registro_id,
     )
     campos = UAFE_PERSONA if party is not None else UAFE_EMPRESA
     _asignar(decl, {c: datos.get(c) for c in campos})

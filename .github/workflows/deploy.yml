@@ -2,12 +2,17 @@ name: Desplegar
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
+
+concurrency:
+  group: desplegar-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   produccion:
     name: Produccion (Windows + IIS)
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, windows-iis]
     steps:
       - name: Desplegar
@@ -17,3 +22,16 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           .\deploy.ps1
+
+  desarrollo:
+    name: Desarrollo (msi-server, Docker)
+    if: github.ref == 'refs/heads/develop'
+    runs-on: [self-hosted, linux, matriz-dev]
+    steps:
+      - name: Desplegar
+        shell: bash
+        run: |
+          cd ~/matriz
+          git fetch origin develop
+          git reset --hard origin/develop
+          bash ./deploy.sh

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # API Key para integración UAFE con sistemas externos
     UAFE_API_KEY: str = ""
 
+    # "desarrollo" solo en el servidor de pruebas (habilita el script de datos falsos)
+    ENTORNO: str = ""
+
     class Config:
         env_file = ".env"
 

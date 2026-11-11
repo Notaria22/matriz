@@ -1,7 +1,10 @@
 from docxtpl import DocxTemplate, RichText
 from pathlib import Path
 from datetime import datetime
-from app.utils.number_to_words import numero_a_letras, numero_a_digitos, formatear_fecha_notarial
+from app.utils.number_to_words import (
+    numero_a_letras, numero_a_digitos, formatear_fecha_notarial,
+    numero_casa_en_direccion, codigo_a_letras, numeros_en_texto_a_letras,
+)
 from app.utils.html_to_richtext import html_to_richtext
 import logging
 import uuid
@@ -34,7 +37,7 @@ def procesar_compareciente(comp, index):
     if comp.get('callePrincipal'):
         direccion_parts.append(comp['callePrincipal'])
     if comp.get('numeroCalle'):
-        direccion_parts.append(f"número {comp['numeroCalle']}")
+        direccion_parts.append(numero_casa_en_direccion(comp['numeroCalle']))
     if comp.get('calleSecundaria'):
         direccion_parts.append(f"y {comp['calleSecundaria']}")
     if comp.get('sector'):
@@ -46,7 +49,7 @@ def procesar_compareciente(comp, index):
     if comp.get('provincia'):
         direccion_parts.append(f"provincia de {comp['provincia']}")
     
-    direccion_completa = ", ".join(direccion_parts)
+    direccion_completa = numeros_en_texto_a_letras(", ".join(direccion_parts))
     
     # Construir texto de profesión/ocupación
     profesion_ocupacion = ""
@@ -133,7 +136,7 @@ def procesar_empresa(comp, index):
     if comp.get('repCallePrincipal'):
         direccion_parts.append(comp['repCallePrincipal'])
     if comp.get('repNumeroCalle'):
-        direccion_parts.append(f"número {comp['repNumeroCalle']}")
+        direccion_parts.append(numero_casa_en_direccion(comp['repNumeroCalle']))
     if comp.get('repCalleSecundaria'):
         direccion_parts.append(f"y {comp['repCalleSecundaria']}")
     if comp.get('repSector'):
@@ -144,14 +147,14 @@ def procesar_empresa(comp, index):
         direccion_parts.append(f"cantón {comp['repCanton']}")
     if comp.get('repProvincia'):
         direccion_parts.append(f"provincia de {comp['repProvincia']}")
-    direccion_rep = ", ".join(direccion_parts)
+    direccion_rep = numeros_en_texto_a_letras(", ".join(direccion_parts))
 
     # Dirección de la empresa
     empresa_direccion_parts = []
     if comp.get('callePrincipal'):
         empresa_direccion_parts.append(comp['callePrincipal'])
     if comp.get('numeroCalle'):
-        empresa_direccion_parts.append(f"número {comp['numeroCalle']}")
+        empresa_direccion_parts.append(numero_casa_en_direccion(comp['numeroCalle']))
     if comp.get('calleSecundaria'):
         empresa_direccion_parts.append(f"y {comp['calleSecundaria']}")
     if comp.get('sector'):
@@ -162,7 +165,7 @@ def procesar_empresa(comp, index):
         empresa_direccion_parts.append(f"cantón {comp['canton']}")
     if comp.get('provincia'):
         empresa_direccion_parts.append(f"provincia de {comp['provincia']}")
-    empresa_direccion = ", ".join(empresa_direccion_parts)
+    empresa_direccion = numeros_en_texto_a_letras(", ".join(empresa_direccion_parts))
 
     # Artículo del representante
     genero_rep = comp.get('repGenero', '').lower()
@@ -282,6 +285,7 @@ def generate_matriz_compraventa(data: dict, template_name: str = "compraventa.do
         'fechaNotarial': fecha_notarial,
         'notario': data.get('notario'),
         'tituloNotario': data.get('tituloNotario'),
+        'accionPersonal': codigo_a_letras(data.get('accionPersonal')) if data.get('accionPersonal') else None,
         'matrizador': data.get('matrizador'),
         
         # Listas de comparecientes procesados
@@ -311,7 +315,7 @@ def generate_matriz_compraventa(data: dict, template_name: str = "compraventa.do
         # Abogado
         'abogadoNombre': data.get('abogadoNombre'),
         'abogadoEsMujer': data.get('abogadoEsMujer', False),
-        'abogadoNumeroMatricula': data.get('abogadoNumeroMatricula'),
+        'abogadoNumeroMatricula': codigo_a_letras(data.get('abogadoNumeroMatricula')),
         'abogadoTipoMatricula': data.get('abogadoTipoMatricula'),
         'abogadoProvincia': data.get('abogadoProvincia'),
         'abogadoTexto': '',
