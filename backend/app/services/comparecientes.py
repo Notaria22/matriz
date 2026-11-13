@@ -54,7 +54,7 @@ COMPANY_IDENTIDAD = [
 UAFE_EMPRESA = [
     "ingreso_mensual", "egreso_mensual", "actividad_empresa", "rol_tramite",
     "origen_fondos", "controlada_supercias", "referencia_supercias",
-    "socios_modalidad", "autoriza_consulta_supercias",
+    "socios_modalidad", "autoriza_consulta_supercias", "patrimonio",
 ]
 
 # Campos del representante dentro del payload de empresa: rep_<campo> -> <campo> de Party
@@ -463,9 +463,8 @@ def serializar_declaracion(decl: DeclaracionUAFE) -> dict:
     for c in campos:
         v = getattr(decl, c)
         data[c] = float(v) if isinstance(v, Decimal) else _valor_json(v) if not isinstance(v, (bool, dict, list)) else v
-    if decl.tipo_sujeto == TipoSujeto.persona:
-        data["situacion_patrimonial"] = data.pop("patrimonio")
-    else:
+    data["situacion_patrimonial"] = data.pop("patrimonio")
+    if decl.tipo_sujeto == TipoSujeto.empresa:
         data["actividad_economica"] = data.pop("actividad_empresa")
         data["socios"] = [
             {

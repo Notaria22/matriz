@@ -84,6 +84,7 @@ class CompanyBase(BaseModel):
     rep_pep_ya_no_ejerce: Optional[bool] = None
     rep_pep_fecha_fin: Optional[date] = None
     rep_patrimonio: Optional[dict[str, Any]] = None
+    patrimonio: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validar_actividad_otra_rep(self):

@@ -98,8 +98,10 @@ const Lista = ({ titulo, filas, noPosee, render }) => (
   <div className="col-span-2">
     <dt className="text-xs text-gray-500">{titulo}</dt>
     <dd className="text-sm text-gray-900">
-      {noPosee || !filas?.length ? (
+      {noPosee ? (
         "No posee"
+      ) : !filas?.length ? (
+        "No declarado"
       ) : (
         <ul className="list-disc ml-5">
           {filas.map((f, i) => (
@@ -111,7 +113,14 @@ const Lista = ({ titulo, filas, noPosee, render }) => (
   </div>
 );
 
-const Patrimonio = ({ pat }) => {
+const tituloPatrimonio = (quien) => (
+  <>
+    Situación patrimonial {quien === "EMPRESA" ? "de la" : "del"}{" "}
+    <strong className="font-extrabold">{quien}</strong>
+  </>
+);
+
+const Patrimonio = ({ pat, quien = "DECLARANTE" }) => {
   if (!pat) return null;
   const tipoInmueble = (i) =>
     i.tipo === "otro"
@@ -124,7 +133,7 @@ const Patrimonio = ({ pat }) => {
     (pat.acciones || []).reduce((t, f) => t + (Number(f.monto) || 0), 0);
 
   return (
-    <Grupo titulo="Situación patrimonial">
+    <Grupo titulo={tituloPatrimonio(quien)}>
       <Lista
         titulo="Propiedades inmuebles"
         filas={pat.inmuebles}
@@ -145,7 +154,11 @@ const Patrimonio = ({ pat }) => {
       />
       <Campo
         etiqueta="Inversiones, pólizas, fondos de acumulación o fideicomisos"
-        valor={pat.no_posee_inversiones ? "No posee" : pat.inversiones}
+        valor={
+          pat.no_posee_inversiones
+            ? "No posee"
+            : pat.inversiones || "No declarado"
+        }
         ancho
       />
       <Lista
@@ -166,6 +179,7 @@ const UAFE = ({
   titulo = "Información Financiera",
   esRepresentado = false,
   esEmpresa = false,
+  quien = "DECLARANTE",
 }) => {
   const esPep = d[`${p}es_pep`] === true;
   const esIndirecto = d[`${p}es_pep_indirecto`] === true;
@@ -268,8 +282,11 @@ const UAFE = ({
           )}
         </Grupo>
       )}
-      {!esEmpresa && (esPep || esIndirecto) && (
-        <Patrimonio pat={d[`${p}patrimonio`]} />
+      {!esEmpresa && (
+        <Patrimonio
+          pat={d[`${p}patrimonio`]}
+          quien={p === "rep_" ? "REPRESENTANTE LEGAL" : quien}
+        />
       )}
     </>
   );
@@ -280,6 +297,7 @@ const Persona = ({
   d,
   esRepresentado = false,
   mostrarEstadoCivil = true,
+  quien = "DECLARANTE",
 }) => (
   <Bloque titulo={titulo}>
     <Grupo>
@@ -316,7 +334,7 @@ const Persona = ({
       <Campo etiqueta="Ocupación" valor={d.occupation} />
       <Campo etiqueta="Profesión" valor={d.profession} />
     </Grupo>
-    <UAFE d={d} esRepresentado={esRepresentado} />
+    <UAFE d={d} esRepresentado={esRepresentado} quien={quien} />
   </Bloque>
 );
 
@@ -357,6 +375,7 @@ const Empresa = ({ e }) => {
         </Grupo>
         <Direccion d={e} titulo="Dirección de la Empresa" />
         <UAFE d={e} esEmpresa titulo="Información Financiera de la Empresa" />
+        <Patrimonio pat={e.patrimonio} quien="EMPRESA" />
         <Grupo titulo="Socios o Accionistas">
           <Campo
             etiqueta="¿La empresa está bajo el control de la Superintendencia de Compañías?"
@@ -562,6 +581,7 @@ const VistaRegistro = ({ registro, imprimible = false }) => {
             <Persona
               titulo="Datos del cónyuge"
               d={payload.conyugue}
+              quien="CÓNYUGE DEL DECLARANTE"
               mostrarEstadoCivil={false}
             />
           )}
@@ -581,6 +601,7 @@ const VistaRegistro = ({ registro, imprimible = false }) => {
             <Persona
               titulo="Datos del Poderdante, Mandante, Representado (cónyuge)"
               d={payload.conyugue}
+              quien="REPRESENTADO"
               mostrarEstadoCivil={false}
               esRepresentado
             />
@@ -591,6 +612,7 @@ const VistaRegistro = ({ registro, imprimible = false }) => {
               <Persona
                 titulo="Datos del Poderdante, Mandante, Representado"
                 d={payload.representado}
+                quien="REPRESENTADO"
                 esRepresentado
               />
               <ConyugeNoComparece d={payload.representado} />
@@ -598,6 +620,7 @@ const VistaRegistro = ({ registro, imprimible = false }) => {
                 <Persona
                   titulo="Datos del cónyuge del Poderdante, Mandante, Representado"
                   d={payload.conyugue_representado}
+                  quien="CÓNYUGE DEL REPRESENTADO"
                   mostrarEstadoCivil={false}
                 />
               )}

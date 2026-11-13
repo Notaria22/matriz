@@ -100,7 +100,28 @@ def direccion(prefijo=""):
     }
 
 
-def uafe(prefijo="", rol=None, pep_probable=True):
+def patrimonio(completo=False):
+    inmuebles = [{"tipo": random.choice(["casa", "departamento", "terreno", "oficina"]),
+                  "ciudad": random.choice(["Quito", "Guayaquil", "Cuenca"]), "especificar": "",
+                  "valor": str(random.randint(40, 400) * 1000)} for _ in range(random.randint(0, 2))]
+    vehiculos = [{"marca": random.choice(["Toyota", "Chevrolet", "Kia", "Hyundai"]),
+                  "modelo": random.choice(["Fortuner", "Sail", "Sportage", "Tucson"]),
+                  "placa": f"P{random.choice('ABCDE')}C-{random.randint(1000, 9999)}",
+                  "valor": str(random.randint(12, 60) * 1000)} for _ in range(random.randint(0, 2))]
+    acciones = [{"entidad": random.choice(EMPRESAS) + " S.A.", "monto": str(random.randint(5, 80) * 1000)}
+                for _ in range(random.randint(0, 1))]
+    inversiones = random.choice(["", "Póliza a plazo fijo en Banco Pichincha"])
+    if not completo and random.random() < 0.4:
+        return None
+    return {
+        "inmuebles": inmuebles, "no_posee_inmuebles": completo and not inmuebles,
+        "vehiculos": vehiculos, "no_posee_vehiculos": completo and not vehiculos,
+        "inversiones": inversiones, "no_posee_inversiones": completo and not inversiones,
+        "acciones": acciones, "no_posee_acciones": completo and not acciones,
+    }
+
+
+def uafe(prefijo="", rol=None, pep_probable=True, patrimonio_completo=False):
     actividad = random.choice(ACTIVIDADES)
     es_pep = pep_probable and random.random() < 0.15
     datos = {
@@ -111,6 +132,7 @@ def uafe(prefijo="", rol=None, pep_probable=True):
         f"{prefijo}origen_fondos": "; ".join(random.sample(ORIGENES, random.randint(1, 2))),
         f"{prefijo}es_pep": es_pep,
         f"{prefijo}es_pep_indirecto": None if es_pep else False,
+        f"{prefijo}patrimonio": patrimonio(patrimonio_completo),
     }
     if es_pep:
         datos.update({
@@ -118,15 +140,6 @@ def uafe(prefijo="", rol=None, pep_probable=True):
             f"{prefijo}pep_cargo": random.choice(["Concejal", "Asesor", "Director"]),
             f"{prefijo}pep_fecha_inicio": fecha_nacimiento(1, 6),
             f"{prefijo}pep_ya_no_ejerce": False,
-            f"{prefijo}patrimonio": {
-                "inmuebles": [{"tipo": "casa", "ciudad": "Quito", "valor": str(random.randint(60, 300) * 1000)}],
-                "no_posee_inmuebles": False,
-                "vehiculos": [{"marca": "Toyota", "modelo": "Fortuner", "placa": f"P{random.choice('ABCDE')}C-{random.randint(1000, 9999)}",
-                               "valor": str(random.randint(15, 60) * 1000)}],
-                "no_posee_vehiculos": False,
-                "inversiones": "", "no_posee_inversiones": True,
-                "acciones": [], "no_posee_acciones": True,
-            },
         })
     return datos
 
@@ -201,7 +214,8 @@ def envio_empresa():
         # En empresas el sector es obligatorio (empresa y representante)
         "sector": dir_emp["sector"] or "Centro",
         "rep_sector": dir_rep["rep_sector"] or "Centro",
-        **uafe("rep_", pep_probable=False),
+        **uafe("rep_", pep_probable=False, patrimonio_completo=True),
+        "patrimonio": patrimonio(completo=True),
     }
     if random.random() < 0.5:
         empresa["socios_modalidad"] = "lista"

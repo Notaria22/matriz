@@ -230,6 +230,38 @@ def _error_400(errores: list[dict]) -> HTTPException:
     )
 
 
+_FILAS_PATRIMONIO = {
+    "inmuebles": (("tipo", "ciudad", "valor"), "Agregue los inmuebles o marque que no posee."),
+    "vehiculos": (("marca", "modelo", "placa", "valor"), "Agregue los vehículos o marque que no posee."),
+    "acciones": (("entidad", "monto"), "Agregue las inversiones o marque que no posee."),
+}
+
+
+def _errores_patrimonio(pat, prefijo: str, seccion: str, obligatoria: bool) -> list[dict]:
+    """Filas empezadas deben estar completas; si es obligatoria, cada parte se declara o se marca 'no posee'."""
+    pat = pat or {}
+    errores = []
+
+    def error(campo, mensaje):
+        errores.append({"campo": f"{prefijo}patrimonio_{campo}", "seccion": seccion, "mensaje": mensaje})
+
+    for lista, (campos, mensaje) in _FILAS_PATRIMONIO.items():
+        if pat.get(f"no_posee_{lista}"):
+            continue
+        filas = [f for f in (pat.get(lista) or []) if any(str(v or "").strip() for v in f.values())]
+        if obligatoria and not filas:
+            error(lista, mensaje)
+        for i, fila in enumerate(pat.get(lista) or []):
+            if fila not in filas:
+                continue
+            for c in campos:
+                if not str(fila.get(c) or "").strip():
+                    error(f"{lista}_{i}_{c}", "Este campo es obligatorio.")
+    if obligatoria and not pat.get("no_posee_inversiones") and not str(pat.get("inversiones") or "").strip():
+        error("inversiones", "Indique las entidades o marque que no posee.")
+    return errores
+
+
 def _validar_envio(payload: dict, tipo: str) -> None:
     """Valida TODO el formulario antes de guardar y devuelve todos los errores juntos."""
     errores = []
@@ -243,6 +275,8 @@ def _validar_envio(payload: dict, tipo: str) -> None:
                 if err["campo"].startswith("rep_"):
                     err["seccion"] = "Representante legal"
                 errores.append(err)
+        errores.extend(_errores_patrimonio(raw.get("patrimonio"), "", "Empresa", True))
+        errores.extend(_errores_patrimonio(raw.get("rep_patrimonio"), "rep_", "Representante legal", True))
     else:
         for clave, prefijo, seccion in _PERSONAS_FORMULARIO:
             raw = payload.get(clave)
@@ -252,6 +286,7 @@ def _validar_envio(payload: dict, tipo: str) -> None:
                 PartyCreate(**raw)
             except ValidationError as e:
                 errores.extend(_errores_de(e, prefijo, seccion))
+            errores.extend(_errores_patrimonio(raw.get("patrimonio"), prefijo, seccion, False))
     if errores:
         raise _error_400(errores)
 

@@ -30,7 +30,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-red-600">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-primary-50 to-primary-100">
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary-600 mb-2">MáTriz</h1>

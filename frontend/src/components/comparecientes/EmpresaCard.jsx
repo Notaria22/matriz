@@ -235,6 +235,15 @@ const EmpresaCard = ({ data }) => {
         </div>
       )}
 
+      {data.patrimonio && (
+        <div className="border-t border-gray-200 pt-4">
+          <h4 className="text-base font-semibold text-gray-700 mb-3">
+            Situación patrimonial de la empresa
+          </h4>
+          <ResumenPatrimonio patrimonio={data.patrimonio} nota={false} />
+        </div>
+      )}
+
       {/* Socios / accionistas */}
       {(socios.length > 0 ||
         data.referenciaSupercias ||
