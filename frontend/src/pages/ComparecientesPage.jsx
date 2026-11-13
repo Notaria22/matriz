@@ -306,6 +306,23 @@ const ComparecientesPage = () => {
             </Button>
           </div>
 
+          {isPersona && currentPersona?.representanteLegalDe?.length > 0 && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+              <p className="font-medium flex items-center gap-2">
+                <Building2 className="w-4 h-4" /> También es representante legal
+                de:
+              </p>
+              <ul className="mt-1 ml-6 list-disc">
+                {currentPersona.representanteLegalDe.map((e) => (
+                  <li key={e.ruc}>
+                    {e.razon_social} (RUC {e.ruc})
+                    {e.cargo ? ` · ${e.cargo}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {registroVigente ? (
             <VistaRegistro registro={registroVigente} />
           ) : isPersona ? (

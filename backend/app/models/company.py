@@ -51,7 +51,7 @@ class Company(Base):
         "DeclaracionUAFE",
         back_populates="company",
         foreign_keys="DeclaracionUAFE.company_id",
-        order_by="DeclaracionUAFE.fecha.desc()",
+        order_by="(DeclaracionUAFE.fecha.desc(), DeclaracionUAFE.id.desc())",
         cascade="all, delete-orphan",
         passive_deletes=True,  # la base borra en cascada (ON DELETE CASCADE)
     )

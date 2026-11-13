@@ -111,7 +111,8 @@ def consultar_uafe(
             "ocupacion": party.occupation,
             "profesion": party.profession,
             "conyugue": conyugue,
-            "uafe": _uafe_persona(svc.ultima_declaracion(party)),
+            "uafe": _uafe_persona(svc.declaracion_vigente_persona(party)),
+            "representante_legal_de": svc.empresas_representadas(party),
             "historial_declaraciones": [svc.serializar_declaracion(d) for d in party.declaraciones],
         }
 

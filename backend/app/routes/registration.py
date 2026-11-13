@@ -424,6 +424,9 @@ def _registrar_empresa(db: Session, empresa_raw: dict, ctx: _Contexto, documento
     datos["referencia_supercias"] = None
 
     rep_datos = svc.datos_rep(datos)
+    # El representante legal participa por la empresa: su calidad es fija y el
+    # origen de los fondos es el de la empresa.
+    rep_datos.update(calidad_participacion="representando", rol_tramite=None, origen_fondos=None)
     company_nueva = svc.buscar_company(db, datos["ruc"]) is None
     rep_nuevo = svc.buscar_party(db, rep_datos["document_number"]) is None
     rep_reportados = company_reportados = None
@@ -702,7 +705,10 @@ def _registro_vigente(db: Session, documento: str, tipo: str) -> Optional[Regist
         party = svc.buscar_party(db, documento)
         if party is None:
             return None
-        q = q.filter(DeclaracionUAFE.party_id == party.id)
+        # Primero sus declaraciones propias; las de representante legal son de la empresa
+        q = q.filter(DeclaracionUAFE.party_id == party.id).order_by(
+            DeclaracionUAFE.declaracion_empresa_id.is_(None).desc()
+        )
     decl = q.order_by(DeclaracionUAFE.fecha.desc(), DeclaracionUAFE.id.desc()).first()
     return db.get(Registro, decl.registro_id) if decl else None
 

@@ -1941,6 +1941,20 @@ const SeccionUAFE = ({
         </div>
       )}
 
+      {esRepresentanteEmpresa && (
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-gray-700">
+            ¿En qué calidad participa en el trámite?
+          </label>
+          <div
+            aria-disabled="true"
+            className="px-3 py-2 rounded-lg text-xs font-medium bg-blue-600 text-white opacity-80 cursor-not-allowed select-none"
+          >
+            REPRESENTANTE LEGAL DE LA EMPRESA
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         <label className="block text-sm font-medium text-gray-700">
           {esRepresentado
@@ -2812,7 +2826,7 @@ const FormularioEmpresa = ({
         onChange={onChange}
         errors={errors}
         prefijo="rep_"
-        mostrarOrigenFondos={true}
+        mostrarOrigenFondos={false}
         tituloFinanciero="Información Financiera del Representante Legal"
       />
     </div>
@@ -3099,7 +3113,7 @@ const validarEmpresa = (datos) => {
   // La empresa exige número en la dirección del representante (backend)
   if (!datos.rep_number_street) errorsRep.rep_number_street = "Requerido";
   if (!datos.rep_position) errorsRep.rep_position = "Requerido";
-  const errorsRepUAFE = validarUAFE(datos, "rep_", true);
+  const errorsRepUAFE = validarUAFE(datos, "rep_", false);
   const formatoEmpresa = Object.fromEntries(
     Object.entries(validarFormato(datos, "")).filter(
       ([k]) => !k.startsWith("rep_"),
@@ -3470,6 +3484,8 @@ const FormularioRegistro = ({
         let empresaPrep = {
           ...vaciosANull(empresa),
           ...prepararUAFE(empresa, "rep_"),
+          rep_rol_tramite: null,
+          rep_origen_fondos: null,
           patrimonio: limpiarPatrimonio(empresa.patrimonio),
           origen_fondos: empresa.rol_tramite
             ? construirOrigenFondosTexto(empresa, "") || null

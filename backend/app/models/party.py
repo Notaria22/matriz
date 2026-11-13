@@ -68,11 +68,14 @@ class Party(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     partner = relationship("Party", remote_side=[id], foreign_keys=[partner_id], post_update=True)
+    empresas_representadas = relationship(
+        "Company", foreign_keys="Company.representante_id", viewonly=True, order_by="Company.razon_social"
+    )
     declaraciones = relationship(
         "DeclaracionUAFE",
         back_populates="party",
         foreign_keys="DeclaracionUAFE.party_id",
-        order_by="DeclaracionUAFE.fecha.desc()",
+        order_by="(DeclaracionUAFE.fecha.desc(), DeclaracionUAFE.id.desc())",
         cascade="all, delete-orphan",
         passive_deletes=True,  # la base borra en cascada (ON DELETE CASCADE)
     )

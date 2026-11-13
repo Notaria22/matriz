@@ -145,6 +145,7 @@ export const transformToCamelCase = (data) => {
     patrimonio: data.patrimonio || null,
     rolTramite: data.rol_tramite || "",
     declaraciones: data.declaraciones || [],
+    representanteLegalDe: data.representante_legal_de || [],
     datosReportadosPendientes: data.datos_reportados_pendientes || [],
     partner: data.partner ? transformToCamelCase(data.partner) : null,
   };

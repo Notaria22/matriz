@@ -220,18 +220,24 @@ const UAFE = ({
               ? "¿En qué calidad participa la empresa en el trámite?"
               : "¿En qué calidad participa en el trámite?"
           }
-          valor={ROLES_TRAMITE[rol] || rol}
-          ancho
-        />
-        <Campo
-          etiqueta={
-            rol === "adquirente"
-              ? "Origen de los fondos con los que pagará el bien que adquiere"
-              : "Origen de los fondos con los que adquirió el bien que transfiere"
+          valor={
+            p === "rep_"
+              ? "Representante legal de la empresa"
+              : ROLES_TRAMITE[rol] || rol
           }
-          valor={d[`${p}origen_fondos`]}
           ancho
         />
+        {p !== "rep_" && (
+          <Campo
+            etiqueta={
+              rol === "adquirente"
+                ? "Origen de los fondos con los que pagará el bien que adquiere"
+                : "Origen de los fondos con los que adquirió el bien que transfiere"
+            }
+            valor={d[`${p}origen_fondos`]}
+            ancho
+          />
+        )}
       </Grupo>
       {!esEmpresa && (
         <Grupo titulo="Persona Políticamente Expuesta (PEP)">

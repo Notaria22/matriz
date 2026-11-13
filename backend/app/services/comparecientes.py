@@ -185,6 +185,29 @@ def ultima_declaracion(party_or_company) -> Optional[DeclaracionUAFE]:
     return decl[0] if decl else None
 
 
+def declaracion_vigente_persona(party: Party) -> Optional[DeclaracionUAFE]:
+    """
+    La última declaración PROPIA de la persona. Las que hizo como representante
+    legal pertenecen a la empresa; solo se usan si nunca declaró por sí misma.
+    """
+    propias = [d for d in party.declaraciones if d.declaracion_empresa_id is None]
+    return propias[0] if propias else ultima_declaracion(party)
+
+
+def empresa_de(decl: DeclaracionUAFE) -> Optional[dict]:
+    if decl.declaracion_empresa is None or decl.declaracion_empresa.company is None:
+        return None
+    c = decl.declaracion_empresa.company
+    return {"ruc": c.ruc, "razon_social": c.razon_social}
+
+
+def empresas_representadas(party: Party) -> list[dict]:
+    return [
+        {"ruc": c.ruc, "razon_social": c.razon_social, "cargo": c.cargo_representante}
+        for c in party.empresas_representadas
+    ]
+
+
 def _uafe_de(decl: Optional[DeclaracionUAFE], campos: list[str]) -> dict:
     if decl is None:
         return {c: None for c in campos}
@@ -238,7 +261,7 @@ def declaracion_si_cambia(
     if not enviados:
         return None
 
-    actual = ultima_declaracion(party)
+    actual = declaracion_vigente_persona(party)
     base = _uafe_de(actual, UAFE_PERSONA)
     nuevos = {**base, **enviados}
 
@@ -292,6 +315,8 @@ def _resumen_declaracion(decl: DeclaracionUAFE) -> dict:
         "origen_fondos": decl.origen_fondos,
         "es_pep": decl.es_pep,
         "es_pep_indirecto": decl.es_pep_indirecto,
+        "es_representante_legal": decl.declaracion_empresa_id is not None,
+        "empresa": empresa_de(decl),
     }
 
 
@@ -313,7 +338,7 @@ def _pendientes(decls: list[DeclaracionUAFE], actual: dict) -> list[dict]:
 
 def serializar_party(party: Party, con_partner: bool = True) -> dict:
     """Mismo JSON plano que devolvía GET /api/users/{documento} antes del refactor."""
-    decl = ultima_declaracion(party)
+    decl = declaracion_vigente_persona(party)
     data = {c: getattr(party, c) for c in PARTY_IDENTIDAD}
     for c in ("document_type", "gender", "marital_status"):
         data[c] = data[c].value if data[c] is not None else None
@@ -331,6 +356,7 @@ def serializar_party(party: Party, con_partner: bool = True) -> dict:
     data["pep_anios_trabajo"] = None  # campo retirado; se mantiene por compatibilidad
 
     data["declaraciones"] = [_resumen_declaracion(d) for d in party.declaraciones]
+    data["representante_legal_de"] = empresas_representadas(party)
     data["datos_reportados_pendientes"] = _pendientes(party.declaraciones, identidad_party_dict(party))
 
     if con_partner:
@@ -459,6 +485,8 @@ def serializar_declaracion(decl: DeclaracionUAFE) -> dict:
         "fecha": decl.fecha.isoformat() if decl.fecha else None,
         "origen": decl.origen.value,
         "registrado_por": decl.registrado_por,
+        "es_representante_legal": decl.declaracion_empresa_id is not None,
+        "empresa": empresa_de(decl),
     }
     for c in campos:
         v = getattr(decl, c)

@@ -180,7 +180,12 @@ const DetalleDeclaracion = ({ id }) => {
 
   return (
     <div className="pt-2 pb-1 space-y-1">
-      {fila("Rol en el trámite", ROL[data.rol_tramite] || data.rol_tramite)}
+      {fila(
+        "Rol en el trámite",
+        data.es_representante_legal
+          ? `Representante legal de ${data.empresa?.razon_social || "la empresa"}`
+          : ROL[data.rol_tramite] || data.rol_tramite,
+      )}
       {fila(
         "Actividad económica",
         etiquetaActividad(
@@ -281,8 +286,10 @@ const HistorialUAFE = ({
                     </p>
                     <p className="text-xs text-gray-500 truncate">
                       {ORIGEN[d.origen] || d.origen}
-                      {d.rol_tramite &&
-                        ` · ${ROL[d.rol_tramite] || d.rol_tramite}`}
+                      {d.es_representante_legal
+                        ? ` · Representante legal de ${d.empresa?.razon_social || "la empresa"}`
+                        : d.rol_tramite &&
+                          ` · ${ROL[d.rol_tramite] || d.rol_tramite}`}
                       {d.es_pep && " · PEP"}
                       {d.es_pep_indirecto && " · Relacionado con PEP"}
                     </p>

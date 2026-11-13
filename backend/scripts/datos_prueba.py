@@ -215,6 +215,8 @@ def envio_empresa():
         "sector": dir_emp["sector"] or "Centro",
         "rep_sector": dir_rep["rep_sector"] or "Centro",
         **uafe("rep_", pep_probable=False, patrimonio_completo=True),
+        "rep_rol_tramite": None,
+        "rep_origen_fondos": None,
         "patrimonio": patrimonio(completo=True),
     }
     if random.random() < 0.5:
