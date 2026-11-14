@@ -91,7 +91,7 @@ def direccion(prefijo=""):
     return cod, {
         f"{prefijo}province": provincia,
         f"{prefijo}canton": canton,
-        f"{prefijo}parroquia": random.choice(parroquias),
+        f"{prefijo}parroquia": random.choice(parroquias + [None]),
         f"{prefijo}sector": random.choice([None, "La Carolina", "El Batán", "Centro", "Urdesa"]),
         f"{prefijo}main_street": principal,
         f"{prefijo}secondary_street": secundaria,
@@ -110,7 +110,9 @@ def patrimonio(completo=False):
                   "valor": str(random.randint(12, 60) * 1000)} for _ in range(random.randint(0, 2))]
     acciones = [{"entidad": random.choice(EMPRESAS) + " S.A.", "monto": str(random.randint(5, 80) * 1000)}
                 for _ in range(random.randint(0, 1))]
-    inversiones = random.choice(["", "Póliza a plazo fijo en Banco Pichincha"])
+    inversiones = random.choice([[], [{"descripcion": "Póliza a plazo fijo en Banco Pichincha por USD 15.000"}],
+                                 [{"descripcion": "Fondo de acumulación en Fondos Pichincha"},
+                                  {"descripcion": "Fideicomiso inmobiliario Torres del Sol"}]])
     if not completo and random.random() < 0.4:
         return None
     return {
@@ -128,8 +130,9 @@ def uafe(prefijo="", rol=None, pep_probable=True, patrimonio_completo=False):
         f"{prefijo}actividad_economica": actividad,
         f"{prefijo}empresa_trabajo": "Banco del Pacífico" if actividad == "empleado" else None,
         f"{prefijo}ingreso_mensual": str(random.choice([800, 1200, 1800, 2500, 4000, 7500])),
-        f"{prefijo}rol_tramite": rol or random.choice(["vendedor", "adquirente"]),
+        f"{prefijo}rol_tramite": rol or random.choice(["vendedor", "adquirente", "otro"]),
         f"{prefijo}origen_fondos": "; ".join(random.sample(ORIGENES, random.randint(1, 2))),
+        f"{prefijo}rol_tramite_otro": random.choice(["Poderdante", "Mandante", "Fiador"]),
         f"{prefijo}es_pep": es_pep,
         f"{prefijo}es_pep_indirecto": None if es_pep else False,
         f"{prefijo}patrimonio": patrimonio(patrimonio_completo),
@@ -170,7 +173,7 @@ def persona(genero=None, estado=None, provincia_cod=None):
 
 def envio_persona():
     titular = persona()
-    rol = random.choice(["vendedor", "adquirente"])
+    rol = random.choice(["vendedor", "adquirente", "otro"])
     titular.update(uafe(rol=rol))
     payload = {"tipo": "persona", "calidad_participacion": "propios_derechos",
                "titular": titular, "acepta_condiciones": True, "acepta_privacidad": True}

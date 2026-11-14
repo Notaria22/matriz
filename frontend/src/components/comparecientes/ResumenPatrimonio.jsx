@@ -28,6 +28,11 @@ export const ResumenPatrimonio = ({ patrimonio, nota = true }) => {
     : p.vehiculos
       ? [{ marca: p.vehiculos }]
       : [];
+  const inversiones = Array.isArray(p.inversiones)
+    ? p.inversiones
+    : p.inversiones
+      ? [{ descripcion: p.inversiones }]
+      : [];
 
   // Total informativo (inmuebles + vehículos + acciones)
   const suma = (lista, campo) =>
@@ -98,9 +103,15 @@ export const ResumenPatrimonio = ({ patrimonio, nota = true }) => {
       )}
 
       {titulo("Inversiones, pólizas, fondos o fideicomisos")}
-      <p className="text-gray-800">
-        {p.no_posee_inversiones || !p.inversiones ? "No posee" : p.inversiones}
-      </p>
+      {p.no_posee_inversiones || inversiones.length === 0 ? (
+        <p className="text-gray-600">No posee</p>
+      ) : (
+        <ul className="list-disc pl-5 text-gray-800">
+          {inversiones.map((inv, idx) => (
+            <li key={idx}>{inv.descripcion}</li>
+          ))}
+        </ul>
+      )}
 
       {titulo("Acciones, participaciones o capital en empresas")}
       {p.no_posee_acciones || !(p.acciones || []).length ? (

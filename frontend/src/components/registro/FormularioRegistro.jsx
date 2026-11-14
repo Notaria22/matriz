@@ -54,6 +54,11 @@ const inmuebleInicial = () => ({
 });
 const vehiculoInicial = () => ({ marca: "", modelo: "", placa: "", valor: "" });
 const accionInicial = () => ({ entidad: "", monto: "" });
+const inversionInicial = () => ({ descripcion: "" });
+
+// Antes las inversiones eran un solo texto; ahora son filas
+const inversionesComoLista = (v) =>
+  Array.isArray(v) ? v : v ? [{ descripcion: String(v) }] : [];
 
 // Cada inmueble, vehículo y participación en empresas es una fila con sus datos.
 const patrimonioInicial = () => ({
@@ -61,7 +66,7 @@ const patrimonioInicial = () => ({
   no_posee_inmuebles: false,
   vehiculos: [],
   no_posee_vehiculos: false,
-  inversiones: "",
+  inversiones: [],
   no_posee_inversiones: false,
   acciones: [],
   no_posee_acciones: false,
@@ -138,12 +143,14 @@ const limpiarPatrimonio = (pat) => {
         .map(limpiar)
         .map((v) => ({ ...v, placa: v.placa.toUpperCase() }))
         .filter(conDatos);
-  if (p.no_posee_inversiones) p.inversiones = "";
+  p.inversiones = p.no_posee_inversiones
+    ? []
+    : inversionesComoLista(p.inversiones).map(limpiar).filter(conDatos);
   const vacio =
     !p.inmuebles.length &&
     !p.vehiculos.length &&
     !p.acciones.length &&
-    !p.inversiones &&
+    !p.inversiones.length &&
     !p.no_posee_inmuebles &&
     !p.no_posee_vehiculos &&
     !p.no_posee_inversiones &&
@@ -178,6 +185,7 @@ const personaInicial = () => ({
   empresa_trabajo: "",
   ingreso_mensual: "",
   rol_tramite: "",
+  rol_tramite_otro: "",
   origen_fondos: "",
   conyugue_comparece: true,
   razon_exclusion_conyugue: "",
@@ -215,6 +223,7 @@ const empresaInicial = () => ({
   egreso_mensual: "",
   actividad_empresa: "",
   rol_tramite: "",
+  rol_tramite_otro: "",
   origen_fondos_lista: [],
   origen_fondos_detalle: {},
   controlada_supercias: "",
@@ -321,6 +330,50 @@ const campoBase = (campo = "") =>
 
 const largoMax = (campo) => LIMITES[campoBase(campo)];
 
+// Campos que se marcan con * (obligatorios cuando se muestran)
+const REQUERIDOS = new Set([
+  "document_number",
+  "names",
+  "last_names",
+  "gender",
+  "marital_status",
+  "birth_date",
+  "email",
+  "phone",
+  "province",
+  "canton",
+  "main_street",
+  "secondary_street",
+  "occupation",
+  "actividad_economica",
+  "actividad_economica_otra",
+  "ingreso_mensual",
+  "egreso_mensual",
+  "rol_tramite_otro",
+  "razon_exclusion_conyugue",
+  "pep_nombre",
+  "pep_relacion_tipo",
+  "pep_grado_relacion",
+  "pep_institucion",
+  "pep_cargo",
+  "pep_fecha_inicio",
+  "pep_fecha_fin",
+  "ruc",
+  "razon_social",
+  "actividad_empresa",
+  "position",
+  "nombres",
+  "tipo",
+  "especificar",
+  "ciudad",
+  "valor",
+  "marca",
+  "descripcion",
+  "entidad",
+  "monto",
+]);
+const requerido = (campo) => REQUERIDOS.has(campoBase(campo)) || undefined;
+
 const ETIQUETAS = {
   document_type: "Tipo de documento",
   document_number: "Número de documento",
@@ -348,6 +401,7 @@ const ETIQUETAS = {
   ingreso_mensual: "Ingreso mensual",
   egreso_mensual: "Egreso mensual",
   rol_tramite: "Calidad en el trámite",
+  rol_tramite_otro: "Forma en la que participa",
   origen_fondos: "Origen de los fondos",
   es_pep: "¿Es PEP?",
   es_pep_indirecto: "¿Es pariente o colaborador de un PEP?",
@@ -380,8 +434,8 @@ const SECCIONES = {
 const PARTES_PATRIMONIO = {
   inmuebles: ["Inmuebles", "Inmueble"],
   vehiculos: ["Vehículos", "Vehículo"],
-  acciones: ["Acciones y participaciones", "Inversión"],
-  inversiones: ["Inversiones, pólizas y fideicomisos"],
+  acciones: ["Acciones y participaciones", "Participación"],
+  inversiones: ["Inversiones, pólizas y fideicomisos", "Inversión"],
 };
 const CAMPOS_PATRIMONIO = {
   tipo: "Tipo",
@@ -393,11 +447,14 @@ const CAMPOS_PATRIMONIO = {
   placa: "Placa",
   entidad: "Entidad",
   monto: "Monto",
+  descripcion: "Descripción",
 };
 
 // "Situación patrimonial · Vehículo 1 · Placa"
 const etiquetaPatrimonio = (resto) => {
-  const fila = resto.match(/^(inmuebles|vehiculos|acciones)_(\d+)_(\w+)$/);
+  const fila = resto.match(
+    /^(inmuebles|vehiculos|acciones|inversiones)_(\d+)_(\w+)$/,
+  );
   if (fila) {
     const [, parte, i, campo] = fila;
     return `Situación patrimonial · ${PARTES_PATRIMONIO[parte][1]} ${Number(i) + 1} · ${CAMPOS_PATRIMONIO[campo] || campo}`;
@@ -466,6 +523,7 @@ const SeccionDireccion = ({
   errors,
   prefijo = "",
   titulo = "Dirección",
+  numeroObligatorio = false,
 }) => (
   <>
     <h3 className="font-medium text-gray-700 pt-2 border-t">{titulo}</h3>
@@ -479,6 +537,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}province`, e.target.value)}
           className={inputClass(errors, `${prefijo}province`)}
           data-campo={`${prefijo}province`}
+          data-requerido={requerido(`${prefijo}province`)}
         >
           <option value="">Seleccione</option>
           {PROVINCIAS_ECUADOR.map((p) => (
@@ -503,6 +562,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}canton`, e.target.value)}
           className={inputClass(errors, `${prefijo}canton`)}
           data-campo={`${prefijo}canton`}
+          data-requerido={requerido(`${prefijo}canton`)}
           maxLength={largoMax(`${prefijo}canton`)}
           placeholder="Ej: Quito"
         />
@@ -522,6 +582,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}parroquia`, e.target.value)}
           className={inputClass(errors, `${prefijo}parroquia`)}
           data-campo={`${prefijo}parroquia`}
+          data-requerido={requerido(`${prefijo}parroquia`)}
           maxLength={largoMax(`${prefijo}parroquia`)}
           placeholder="Ej: Nayón"
         />
@@ -541,6 +602,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}sector`, e.target.value)}
           className={inputClass(errors, `${prefijo}sector`)}
           data-campo={`${prefijo}sector`}
+          data-requerido={requerido(`${prefijo}sector`)}
           maxLength={largoMax(`${prefijo}sector`)}
           placeholder="Ej: Valle Colores"
         />
@@ -560,6 +622,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}main_street`, e.target.value)}
           className={inputClass(errors, `${prefijo}main_street`)}
           data-campo={`${prefijo}main_street`}
+          data-requerido={requerido(`${prefijo}main_street`)}
           maxLength={largoMax(`${prefijo}main_street`)}
           placeholder="Ej: Av. Los Eucaliptos"
         />
@@ -581,6 +644,7 @@ const SeccionDireccion = ({
           }
           className={inputClass(errors, `${prefijo}secondary_street`)}
           data-campo={`${prefijo}secondary_street`}
+          data-requerido={requerido(`${prefijo}secondary_street`)}
           maxLength={largoMax(`${prefijo}secondary_street`)}
           placeholder="Ej: Calle Eugenio Espejo"
         />
@@ -600,6 +664,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}number_street`, e.target.value)}
           className={inputClass(errors, `${prefijo}number_street`)}
           data-campo={`${prefijo}number_street`}
+          data-requerido={numeroObligatorio || undefined}
           maxLength={largoMax(`${prefijo}number_street`)}
           placeholder="Ej: E13-51 o S/N"
         />
@@ -623,6 +688,7 @@ const SeccionDireccion = ({
           onChange={(e) => onChange(`${prefijo}referencia`, e.target.value)}
           className={inputClass(errors, `${prefijo}referencia`)}
           data-campo={`${prefijo}referencia`}
+          data-requerido={requerido(`${prefijo}referencia`)}
           maxLength={largoMax(`${prefijo}referencia`)}
           placeholder="Ej: atrás de SOLCA, edificio Torres del Norte, departamento 3B"
         />
@@ -668,6 +734,7 @@ const SeccionConyugue = ({ datos, onChange, errors, prefijo = "" }) => {
             }
             className={inputClass(errors, `${prefijo}razon_exclusion_conyugue`)}
             data-campo={`${prefijo}razon_exclusion_conyugue`}
+            data-requerido={requerido(`${prefijo}razon_exclusion_conyugue`)}
           >
             <option value="">Seleccione una razón</option>
             {RAZONES_EXCLUSION_CONYUGUE.map((r) => (
@@ -709,6 +776,7 @@ const FormularioPEP = ({
           }
           className={inputClass(errors, `${prefijo}pep_nombre`)}
           data-campo={`${prefijo}pep_nombre`}
+          data-requerido={requerido(`${prefijo}pep_nombre`)}
           maxLength={largoMax(`${prefijo}pep_nombre`)}
           placeholder="Nombre completo"
         />
@@ -729,6 +797,7 @@ const FormularioPEP = ({
         onChange={(e) => onChange(`${prefijo}pep_institucion`, e.target.value)}
         className={inputClass(errors, `${prefijo}pep_institucion`)}
         data-campo={`${prefijo}pep_institucion`}
+        data-requerido={requerido(`${prefijo}pep_institucion`)}
         maxLength={largoMax(`${prefijo}pep_institucion`)}
         placeholder="Ej: Ministerio de Finanzas"
       />
@@ -748,6 +817,7 @@ const FormularioPEP = ({
         onChange={(e) => onChange(`${prefijo}pep_fecha_inicio`, e.target.value)}
         className={inputClass(errors, `${prefijo}pep_fecha_inicio`)}
         data-campo={`${prefijo}pep_fecha_inicio`}
+        data-requerido={requerido(`${prefijo}pep_fecha_inicio`)}
         maxLength={largoMax(`${prefijo}pep_fecha_inicio`)}
       />
       {errors[`${prefijo}pep_fecha_inicio`] && (
@@ -781,6 +851,7 @@ const FormularioPEP = ({
           onChange={(e) => onChange(`${prefijo}pep_fecha_fin`, e.target.value)}
           className={inputClass(errors, `${prefijo}pep_fecha_fin`)}
           data-campo={`${prefijo}pep_fecha_fin`}
+          data-requerido={requerido(`${prefijo}pep_fecha_fin`)}
           maxLength={largoMax(`${prefijo}pep_fecha_fin`)}
         />
         {errors[`${prefijo}pep_fecha_fin`] && (
@@ -800,6 +871,7 @@ const FormularioPEP = ({
         onChange={(e) => onChange(`${prefijo}pep_cargo`, e.target.value)}
         className={inputClass(errors, `${prefijo}pep_cargo`)}
         data-campo={`${prefijo}pep_cargo`}
+        data-requerido={requerido(`${prefijo}pep_cargo`)}
         maxLength={largoMax(`${prefijo}pep_cargo`)}
         placeholder="Ej: Director General"
       />
@@ -822,6 +894,7 @@ const FormularioPEP = ({
             }
             className={inputClass(errors, `${prefijo}pep_relacion_tipo`)}
             data-campo={`${prefijo}pep_relacion_tipo`}
+            data-requerido={requerido(`${prefijo}pep_relacion_tipo`)}
           >
             <option value="">Seleccione</option>
             {RELACIONES_PEP.map((r) => (
@@ -849,6 +922,7 @@ const FormularioPEP = ({
             }
             className={inputClass(errors, `${prefijo}pep_grado_relacion`)}
             data-campo={`${prefijo}pep_grado_relacion`}
+            data-requerido={requerido(`${prefijo}pep_grado_relacion`)}
             maxLength={largoMax(`${prefijo}pep_grado_relacion`)}
             placeholder="Ej: Primer grado de consanguinidad"
           />
@@ -889,7 +963,7 @@ const SeccionOrigenFondos = ({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label className="requerido block text-sm font-medium text-gray-700 mb-2">
         {label}
       </label>
       <div
@@ -925,6 +999,7 @@ const SeccionOrigenFondos = ({
                           onChange={(e) => setDetalle(clave, e.target.value)}
                           className={inputClass(errors, errKey)}
                           data-campo={errKey}
+                          data-requerido={requerido(errKey)}
                           maxLength={largoMax(errKey)}
                           placeholder={d.placeholder}
                         />
@@ -960,7 +1035,6 @@ const SeccionPatrimonio = ({
   onChange,
   errors,
   prefijo = "",
-  obligatoria = false,
   esEmpresa = false,
   de = "DECLARANTE",
 }) => {
@@ -968,9 +1042,9 @@ const SeccionPatrimonio = ({
     ...patrimonioInicial(),
     ...(datos[`${prefijo}patrimonio`] || {}),
   };
+  pat.inversiones = inversionesComoLista(pat.inversiones);
   const guardar = (cambios) =>
     onChange(`${prefijo}patrimonio`, { ...pat, ...cambios });
-  const set = (campo, valor) => guardar({ [campo]: valor });
   const key = (campo) => `${prefijo}patrimonio_${campo}`;
   const errorMsg = (campo) =>
     errors[key(campo)] ? (
@@ -1010,9 +1084,6 @@ const SeccionPatrimonio = ({
         <p className="text-sm font-semibold text-gray-800">
           Situación patrimonial {esEmpresa ? "de la" : "del"}{" "}
           <strong className="font-extrabold">{de}</strong>
-          {!obligatoria && (
-            <span className="font-normal text-gray-500"> (opcional)</span>
-          )}
         </p>
         <p className="text-xs text-gray-600">
           Estimado usuario, por cumplimiento de la normativa UAFE, proporcione
@@ -1028,7 +1099,8 @@ const SeccionPatrimonio = ({
       <div className="space-y-2">
         <label
           data-campo={key("inmuebles")}
-          className="block text-sm font-medium text-gray-700"
+          data-requerido={requerido(key("inmuebles"))}
+          className="requerido block text-sm font-medium text-gray-700"
         >
           Identifique las propiedades inmuebles de las que{" "}
           {esEmpresa ? "la empresa es propietaria" : "es propietario"}.
@@ -1058,6 +1130,7 @@ const SeccionPatrimonio = ({
                       }
                       className={inputClass(errors, key(`inmuebles_${i}_tipo`))}
                       data-campo={key(`inmuebles_${i}_tipo`)}
+                      data-requerido={requerido(key(`inmuebles_${i}_tipo`))}
                     >
                       <option value="">Seleccione</option>
                       {TIPOS_INMUEBLE_PATRIMONIO.map((t) => (
@@ -1105,6 +1178,7 @@ const SeccionPatrimonio = ({
                         key(`inmuebles_${i}_ciudad`),
                       )}
                       data-campo={key(`inmuebles_${i}_ciudad`)}
+                      data-requerido={requerido(key(`inmuebles_${i}_ciudad`))}
                       maxLength={largoMax(key(`inmuebles_${i}_ciudad`))}
                       placeholder="Ej: Quito"
                     />
@@ -1126,6 +1200,7 @@ const SeccionPatrimonio = ({
                         key(`inmuebles_${i}_valor`),
                       )}
                       data-campo={key(`inmuebles_${i}_valor`)}
+                      data-requerido={requerido(key(`inmuebles_${i}_valor`))}
                       maxLength={largoMax(key(`inmuebles_${i}_valor`))}
                       placeholder="Ej: 150000"
                     />
@@ -1170,7 +1245,8 @@ const SeccionPatrimonio = ({
       <div className="space-y-2">
         <label
           data-campo={key("vehiculos")}
-          className="block text-sm font-medium text-gray-700"
+          data-requerido={requerido(key("vehiculos"))}
+          className="requerido block text-sm font-medium text-gray-700"
         >
           Identifique los vehículos de los que{" "}
           {esEmpresa ? "la empresa es propietaria" : "es propietario"}.
@@ -1204,55 +1280,11 @@ const SeccionPatrimonio = ({
                         key(`vehiculos_${i}_marca`),
                       )}
                       data-campo={key(`vehiculos_${i}_marca`)}
+                      data-requerido={requerido(key(`vehiculos_${i}_marca`))}
                       maxLength={largoMax(key(`vehiculos_${i}_marca`))}
                       placeholder="Ej: Toyota"
                     />
                     {errorMsg(`vehiculos_${i}_marca`)}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Modelo
-                    </label>
-                    <input
-                      type="text"
-                      value={veh.modelo}
-                      onChange={(e) =>
-                        setFila("vehiculos", i, "modelo", e.target.value)
-                      }
-                      className={inputClass(
-                        errors,
-                        key(`vehiculos_${i}_modelo`),
-                      )}
-                      data-campo={key(`vehiculos_${i}_modelo`)}
-                      maxLength={largoMax(key(`vehiculos_${i}_modelo`))}
-                      placeholder="Ej: Hilux"
-                    />
-                    {errorMsg(`vehiculos_${i}_modelo`)}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Placa
-                    </label>
-                    <input
-                      type="text"
-                      value={veh.placa}
-                      onChange={(e) =>
-                        setFila(
-                          "vehiculos",
-                          i,
-                          "placa",
-                          e.target.value.toUpperCase(),
-                        )
-                      }
-                      className={inputClass(
-                        errors,
-                        key(`vehiculos_${i}_placa`),
-                      )}
-                      data-campo={key(`vehiculos_${i}_placa`)}
-                      placeholder="Ej: PBC-1234"
-                      maxLength={10}
-                    />
-                    {errorMsg(`vehiculos_${i}_placa`)}
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">
@@ -1270,10 +1302,58 @@ const SeccionPatrimonio = ({
                         key(`vehiculos_${i}_valor`),
                       )}
                       data-campo={key(`vehiculos_${i}_valor`)}
+                      data-requerido={requerido(key(`vehiculos_${i}_valor`))}
                       maxLength={largoMax(key(`vehiculos_${i}_valor`))}
                       placeholder="Ej: 30000"
                     />
                     {errorMsg(`vehiculos_${i}_valor`)}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Modelo (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={veh.modelo}
+                      onChange={(e) =>
+                        setFila("vehiculos", i, "modelo", e.target.value)
+                      }
+                      className={inputClass(
+                        errors,
+                        key(`vehiculos_${i}_modelo`),
+                      )}
+                      data-campo={key(`vehiculos_${i}_modelo`)}
+                      data-requerido={requerido(key(`vehiculos_${i}_modelo`))}
+                      maxLength={largoMax(key(`vehiculos_${i}_modelo`))}
+                      placeholder="Ej: Hilux"
+                    />
+                    {errorMsg(`vehiculos_${i}_modelo`)}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Placa (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={veh.placa}
+                      onChange={(e) =>
+                        setFila(
+                          "vehiculos",
+                          i,
+                          "placa",
+                          e.target.value.toUpperCase(),
+                        )
+                      }
+                      className={inputClass(
+                        errors,
+                        key(`vehiculos_${i}_placa`),
+                      )}
+                      data-campo={key(`vehiculos_${i}_placa`)}
+                      data-requerido={requerido(key(`vehiculos_${i}_placa`))}
+                      placeholder="Ej: PBC-1234"
+                      maxLength={10}
+                    />
+                    {errorMsg(`vehiculos_${i}_placa`)}
                   </div>
                 </div>
               </div>
@@ -1312,27 +1392,71 @@ const SeccionPatrimonio = ({
       <div className="space-y-2">
         <label
           data-campo={key("inversiones")}
-          className="block text-sm font-medium text-gray-700"
+          data-requerido={requerido(key("inversiones"))}
+          className="requerido block text-sm font-medium text-gray-700"
         >
           Si tiene inversiones, pólizas, fondos de acumulación o fideicomisos,
           indique las entidades donde los mantiene.
         </label>
         {!pat.no_posee_inversiones && (
-          <input
-            type="text"
-            value={pat.inversiones}
-            onChange={(e) => set("inversiones", e.target.value)}
-            className={inputClass(errors, key("inversiones"))}
-            data-campo={key("inversiones")}
-            maxLength={largoMax(key("inversiones"))}
-            placeholder="Ej: Póliza en Banco Pichincha, fideicomiso en Fiducia S.A."
-          />
+          <div className="space-y-3">
+            {pat.inversiones.map((inv, i) => (
+              <div
+                key={i}
+                className="p-3 bg-white border border-gray-200 rounded-lg space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">
+                    Inversión {i + 1}
+                  </span>
+                  {botonQuitar("inversiones", i)}
+                </div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  Tipo, entidad y valor aproximado
+                </label>
+                <input
+                  type="text"
+                  value={inv.descripcion}
+                  onChange={(e) =>
+                    setFila("inversiones", i, "descripcion", e.target.value)
+                  }
+                  className={inputClass(
+                    errors,
+                    key(`inversiones_${i}_descripcion`),
+                  )}
+                  data-campo={key(`inversiones_${i}_descripcion`)}
+                  data-requerido={requerido(
+                    key(`inversiones_${i}_descripcion`),
+                  )}
+                  maxLength={300}
+                  placeholder="Ej: Póliza de vida en Seguros Equinoccial por USD 10.000"
+                />
+                {errorMsg(`inversiones_${i}_descripcion`)}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => agregarFila("inversiones", inversionInicial())}
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              {pat.inversiones.length
+                ? "+ Agregar otra inversión, póliza o fideicomiso"
+                : "+ Agregar inversión, póliza o fideicomiso"}
+            </button>
+          </div>
         )}
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={pat.no_posee_inversiones}
-            onChange={(e) => set("no_posee_inversiones", e.target.checked)}
+            onChange={(e) =>
+              toggleNoPosee(
+                "no_posee_inversiones",
+                "inversiones",
+                inversionInicial,
+                e.target.checked,
+              )
+            }
             className="w-4 h-4 rounded text-gray-600"
           />
           <span className="text-sm text-gray-600">
@@ -1346,7 +1470,8 @@ const SeccionPatrimonio = ({
       <div className="space-y-2">
         <label
           data-campo={key("acciones")}
-          className="block text-sm font-medium text-gray-700"
+          data-requerido={requerido(key("acciones"))}
+          className="requerido block text-sm font-medium text-gray-700"
         >
           Si tiene acciones, participaciones o capital invertido en empresas
           nacionales o extranjeras, indique las entidades y el monto de sus
@@ -1381,6 +1506,7 @@ const SeccionPatrimonio = ({
                         key(`acciones_${i}_entidad`),
                       )}
                       data-campo={key(`acciones_${i}_entidad`)}
+                      data-requerido={requerido(key(`acciones_${i}_entidad`))}
                       maxLength={largoMax(key(`acciones_${i}_entidad`))}
                       placeholder="Ej: Constructora Andes S.A."
                     />
@@ -1399,6 +1525,7 @@ const SeccionPatrimonio = ({
                       }
                       className={inputClass(errors, key(`acciones_${i}_monto`))}
                       data-campo={key(`acciones_${i}_monto`)}
+                      data-requerido={requerido(key(`acciones_${i}_monto`))}
                       maxLength={largoMax(key(`acciones_${i}_monto`))}
                       placeholder="Ej: 20000"
                     />
@@ -1413,8 +1540,8 @@ const SeccionPatrimonio = ({
               className="text-sm font-medium text-blue-600 hover:underline"
             >
               {pat.acciones.length
-                ? "+ Agregar otra inversión"
-                : "+ Agregar inversión"}
+                ? "+ Agregar otra participación"
+                : "+ Agregar acción o participación"}
             </button>
           </div>
         )}
@@ -1523,7 +1650,7 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
         Socios o Accionistas
       </h3>
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="requerido block text-sm font-medium text-gray-700">
           ¿La empresa está bajo el control de la Superintendencia de Compañías?
         </label>
         <div className="flex gap-3">
@@ -1609,6 +1736,7 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
                   }
                   className={inputClass(errors, `socios_${i}_nombres`)}
                   data-campo={`socios_${i}_nombres`}
+                  data-requerido={requerido(`socios_${i}_nombres`)}
                   maxLength={largoMax(`socios_${i}_nombres`)}
                   placeholder="NOMBRES Y APELLIDOS"
                 />
@@ -1629,6 +1757,7 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
                   }
                   className={inputClass(errors, `socios_${i}_tipo_documento`)}
                   data-campo={`socios_${i}_tipo_documento`}
+                  data-requerido={requerido(`socios_${i}_tipo_documento`)}
                 >
                   <option value="cedula">Cédula</option>
                   <option value="pasaporte">Pasaporte</option>
@@ -1655,6 +1784,7 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
                   }
                   className={inputClass(errors, `socios_${i}_numero_documento`)}
                   data-campo={`socios_${i}_numero_documento`}
+                  data-requerido={requerido(`socios_${i}_numero_documento`)}
                   maxLength={socio.tipo_documento === "cedula" ? 10 : 20}
                 />
                 {errors[`socios_${i}_numero_documento`] && (
@@ -1675,6 +1805,7 @@ const SeccionSocios = ({ datos, onChange, errors }) => {
                   onChange={(e) => setSocio(i, "porcentaje", e.target.value)}
                   className={inputClass(errors, `socios_${i}_porcentaje`)}
                   data-campo={`socios_${i}_porcentaje`}
+                  data-requerido={requerido(`socios_${i}_porcentaje`)}
                   maxLength={largoMax(`socios_${i}_porcentaje`)}
                 />
                 {errors[`socios_${i}_porcentaje`] && (
@@ -1811,6 +1942,7 @@ const SeccionUAFE = ({
             }
             className={inputClass(errors, `${prefijo}actividad_economica`)}
             data-campo={`${prefijo}actividad_economica`}
+            data-requerido={requerido(`${prefijo}actividad_economica`)}
           >
             <option value="">Seleccione</option>
             {ACTIVIDADES_ECONOMICAS.filter(
@@ -1841,6 +1973,7 @@ const SeccionUAFE = ({
             }
             className={inputClass(errors, `${prefijo}ingreso_mensual`)}
             data-campo={`${prefijo}ingreso_mensual`}
+            data-requerido={requerido(`${prefijo}ingreso_mensual`)}
             maxLength={largoMax(`${prefijo}ingreso_mensual`)}
             placeholder="Ej: 1500"
           />
@@ -1866,6 +1999,7 @@ const SeccionUAFE = ({
                 `${prefijo}actividad_economica_otra`,
               )}
               data-campo={`${prefijo}actividad_economica_otra`}
+              data-requerido={requerido(`${prefijo}actividad_economica_otra`)}
               placeholder="Ej: Agricultor"
               maxLength={200}
             />
@@ -1889,6 +2023,7 @@ const SeccionUAFE = ({
               }
               className={inputClass(errors, `${prefijo}empresa_trabajo`)}
               data-campo={`${prefijo}empresa_trabajo`}
+              data-requerido={requerido(`${prefijo}empresa_trabajo`)}
               maxLength={largoMax(`${prefijo}empresa_trabajo`)}
               placeholder="Ej: Empresa XYZ S.A."
             />
@@ -1903,7 +2038,7 @@ const SeccionUAFE = ({
 
       {mostrarOrigenFondos && (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="requerido block text-sm font-medium text-gray-700">
             ¿En qué calidad participa en el trámite?
           </label>
           <div className="flex flex-col gap-2">
@@ -1923,21 +2058,53 @@ const SeccionUAFE = ({
               ADQUIRIENTE/S – COMPRADOR/ES – DONATARIO/S – CESIONARIO/S –
               ADJUDICATARIO/S - DEUDORES - BENEFICIARIOS
             </button>
+            <button
+              type="button"
+              onClick={() => onChange(`${prefijo}rol_tramite`, "otro")}
+              className={`px-3 py-2 rounded-lg text-xs font-medium text-left ${datos[`${prefijo}rol_tramite`] === "otro" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+            >
+              OTRA FORMA EN LA QUE PARTICIPA EN EL TRÁMITE
+            </button>
           </div>
           {errors[`${prefijo}rol_tramite`] && (
             <p className="text-red-500 text-xs mt-1">
               {errors[`${prefijo}rol_tramite`]}
             </p>
           )}
-          {datos[`${prefijo}rol_tramite`] && (
-            <SeccionOrigenFondos
-              datos={datos}
-              onChange={onChange}
-              errors={errors}
-              prefijo={prefijo}
-              label={labelOrigenFondos}
-            />
+          {datos[`${prefijo}rol_tramite`] === "otro" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Describa la forma en la que participa
+              </label>
+              <input
+                type="text"
+                value={datos[`${prefijo}rol_tramite_otro`] || ""}
+                onChange={(e) =>
+                  onChange(`${prefijo}rol_tramite_otro`, e.target.value)
+                }
+                className={inputClass(errors, `${prefijo}rol_tramite_otro`)}
+                data-campo={`${prefijo}rol_tramite_otro`}
+                data-requerido={requerido(`${prefijo}rol_tramite_otro`)}
+                maxLength={200}
+                placeholder="Ej: Poderdante, mandante, fiador"
+              />
+              {errors[`${prefijo}rol_tramite_otro`] && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors[`${prefijo}rol_tramite_otro`]}
+                </p>
+              )}
+            </div>
           )}
+          {datos[`${prefijo}rol_tramite`] &&
+            datos[`${prefijo}rol_tramite`] !== "otro" && (
+              <SeccionOrigenFondos
+                datos={datos}
+                onChange={onChange}
+                errors={errors}
+                prefijo={prefijo}
+                label={labelOrigenFondos}
+              />
+            )}
         </div>
       )}
 
@@ -1956,7 +2123,7 @@ const SeccionUAFE = ({
       )}
 
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="requerido block text-sm font-medium text-gray-700">
           {esRepresentado
             ? "¿Es su Mandante una Persona Políticamente Expuesta (PEP)?"
             : "¿Es usted una Persona Políticamente Expuesta (PEP)?"}
@@ -2017,7 +2184,7 @@ const SeccionUAFE = ({
 
       {noesPep && (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="requerido block text-sm font-medium text-gray-700">
             ¿Es pariente, amigo o colaborador de una Persona Políticamente
             Expuesta?
           </label>
@@ -2067,7 +2234,6 @@ const SeccionUAFE = ({
         onChange={onChange}
         errors={errors}
         prefijo={prefijo}
-        obligatoria={esRepresentanteEmpresa}
         de={esRepresentanteEmpresa ? "REPRESENTANTE LEGAL" : patrimonioDe}
       />
     </>
@@ -2105,6 +2271,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("document_type", e.target.value)}
           className={inputClass(errors, "document_type")}
           data-campo={"document_type"}
+          data-requerido={requerido("document_type")}
           disabled={documentoFijo}
         >
           <option value="cedula">Cédula</option>
@@ -2126,6 +2293,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("document_number", e.target.value)}
           className={inputClass(errors, "document_number")}
           data-campo={"document_number"}
+          data-requerido={requerido("document_number")}
           placeholder={
             datos.document_type === "cedula" ? "0000000000" : "AB123456"
           }
@@ -2154,6 +2322,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("names", e.target.value.toUpperCase())}
           className={inputClass(errors, "names")}
           data-campo={"names"}
+          data-requerido={requerido("names")}
           maxLength={largoMax("names")}
           placeholder="NOMBRES"
         />
@@ -2171,6 +2340,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("last_names", e.target.value.toUpperCase())}
           className={inputClass(errors, "last_names")}
           data-campo={"last_names"}
+          data-requerido={requerido("last_names")}
           maxLength={largoMax("last_names")}
           placeholder="APELLIDOS"
         />
@@ -2190,6 +2360,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("gender", e.target.value)}
           className={inputClass(errors, "gender")}
           data-campo={"gender"}
+          data-requerido={requerido("gender")}
         >
           <option value="">Seleccione</option>
           <option value="masculino">Masculino</option>
@@ -2209,6 +2380,7 @@ const FormularioPersona = ({
             onChange={(e) => onChange("marital_status", e.target.value)}
             className={inputClass(errors, "marital_status")}
             data-campo={"marital_status"}
+            data-requerido={requerido("marital_status")}
           >
             <option value="">Seleccione</option>
             <option value="soltero">Soltero/a</option>
@@ -2236,6 +2408,7 @@ const FormularioPersona = ({
           }
           className={inputClass(errors, "nationality")}
           data-campo={"nationality"}
+          data-requerido={requerido("nationality")}
           maxLength={largoMax("nationality")}
           placeholder="ecuatoriana"
         />
@@ -2253,6 +2426,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("birth_date", e.target.value)}
           className={inputClass(errors, "birth_date")}
           data-campo={"birth_date"}
+          data-requerido={requerido("birth_date")}
           maxLength={largoMax("birth_date")}
         />
         {errors.birth_date && (
@@ -2273,6 +2447,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("email", e.target.value)}
           className={inputClass(errors, "email")}
           data-campo={"email"}
+          data-requerido={requerido("email")}
           maxLength={largoMax("email")}
           placeholder="correo@ejemplo.com"
         />
@@ -2290,6 +2465,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("phone", e.target.value)}
           className={inputClass(errors, "phone")}
           data-campo={"phone"}
+          data-requerido={requerido("phone")}
           placeholder="0987654321"
           maxLength={10}
         />
@@ -2335,6 +2511,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("occupation", e.target.value)}
           className={inputClass(errors, "occupation")}
           data-campo={"occupation"}
+          data-requerido={requerido("occupation")}
           maxLength={largoMax("occupation")}
           placeholder="Ej: comerciante"
         />
@@ -2352,6 +2529,7 @@ const FormularioPersona = ({
           onChange={(e) => onChange("profession", e.target.value)}
           className={inputClass(errors, "profession")}
           data-campo={"profession"}
+          data-requerido={requerido("profession")}
           maxLength={largoMax("profession")}
           placeholder="Ej: Ingeniero Civil"
         />
@@ -2396,6 +2574,7 @@ const FormularioEmpresa = ({
           onChange={(e) => onChange("ruc", e.target.value)}
           className={inputClass(errors, "ruc")}
           data-campo={"ruc"}
+          data-requerido={requerido("ruc")}
           placeholder="0000000000001"
           maxLength={13}
           readOnly={documentoFijo}
@@ -2422,6 +2601,7 @@ const FormularioEmpresa = ({
           }
           className={inputClass(errors, "razon_social")}
           data-campo={"razon_social"}
+          data-requerido={requerido("razon_social")}
           maxLength={largoMax("razon_social")}
           placeholder="EMPRESA XYZ S.A."
         />
@@ -2444,6 +2624,7 @@ const FormularioEmpresa = ({
           onChange={(e) => onChange("email", e.target.value)}
           className={inputClass(errors, "email")}
           data-campo={"email"}
+          data-requerido={requerido("email")}
           maxLength={largoMax("email")}
           placeholder="empresa@ejemplo.com"
         />
@@ -2461,6 +2642,7 @@ const FormularioEmpresa = ({
           onChange={(e) => onChange("phone", e.target.value)}
           className={inputClass(errors, "phone")}
           data-campo={"phone"}
+          data-requerido={requerido("phone")}
           placeholder="0987654321"
           maxLength={10}
         />
@@ -2474,6 +2656,7 @@ const FormularioEmpresa = ({
       onChange={onChange}
       errors={errors}
       titulo="Dirección de la Empresa"
+      numeroObligatorio
     />
     <h3 className="font-medium text-gray-700 pt-2 border-t">
       Información Financiera de la Empresa
@@ -2489,6 +2672,7 @@ const FormularioEmpresa = ({
           onChange={(e) => onChange("actividad_empresa", e.target.value)}
           className={inputClass(errors, "actividad_empresa")}
           data-campo={"actividad_empresa"}
+          data-requerido={requerido("actividad_empresa")}
           maxLength={largoMax("actividad_empresa")}
           placeholder="Ej: Comercialización de materiales de construcción"
         />
@@ -2510,6 +2694,7 @@ const FormularioEmpresa = ({
           onChange={(e) => onChange("ingreso_mensual", e.target.value)}
           className={inputClass(errors, "ingreso_mensual")}
           data-campo={"ingreso_mensual"}
+          data-requerido={requerido("ingreso_mensual")}
           maxLength={largoMax("ingreso_mensual")}
           placeholder="Ej: 50000"
         />
@@ -2529,6 +2714,7 @@ const FormularioEmpresa = ({
           onChange={(e) => onChange("egreso_mensual", e.target.value)}
           className={inputClass(errors, "egreso_mensual")}
           data-campo={"egreso_mensual"}
+          data-requerido={requerido("egreso_mensual")}
           maxLength={largoMax("egreso_mensual")}
           placeholder="Ej: 35000"
         />
@@ -2538,7 +2724,7 @@ const FormularioEmpresa = ({
       </div>
     </div>
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="requerido block text-sm font-medium text-gray-700">
         ¿En qué calidad participa la empresa en el trámite?
       </label>
       <div className="flex flex-col gap-2">
@@ -2551,6 +2737,7 @@ const FormularioEmpresa = ({
             v: "adquirente",
             l: "ADQUIRIENTE – COMPRADORA – DONATARIA – CESIONARIA – ADJUDICATARIA - DEUDORA - BENEFICIARIA",
           },
+          { v: "otro", l: "OTRA FORMA EN LA QUE PARTICIPA EN EL TRÁMITE" },
         ].map(({ v, l }) => (
           <button
             key={v}
@@ -2565,7 +2752,28 @@ const FormularioEmpresa = ({
       {errors.rol_tramite && (
         <p className="text-red-500 text-xs mt-1">{errors.rol_tramite}</p>
       )}
-      {datos.rol_tramite && (
+      {datos.rol_tramite === "otro" && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Describa la forma en la que participa la empresa
+          </label>
+          <input
+            type="text"
+            value={datos.rol_tramite_otro || ""}
+            onChange={(e) => onChange("rol_tramite_otro", e.target.value)}
+            className={inputClass(errors, "rol_tramite_otro")}
+            data-campo="rol_tramite_otro"
+            maxLength={200}
+            placeholder="Ej: Poderdante, mandante, fiadora"
+          />
+          {errors.rol_tramite_otro && (
+            <p className="text-red-500 text-xs mt-1">
+              {errors.rol_tramite_otro}
+            </p>
+          )}
+        </div>
+      )}
+      {datos.rol_tramite && datos.rol_tramite !== "otro" && (
         <SeccionOrigenFondos
           datos={datos}
           onChange={onChange}
@@ -2583,7 +2791,6 @@ const FormularioEmpresa = ({
       datos={datos}
       onChange={onChange}
       errors={errors}
-      obligatoria
       esEmpresa
       de="EMPRESA"
     />
@@ -2602,6 +2809,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_document_type", e.target.value)}
             className={inputClass(errors, "rep_document_type")}
             data-campo={"rep_document_type"}
+            data-requerido={requerido("rep_document_type")}
           >
             <option value="cedula">Cédula</option>
             <option value="pasaporte">Pasaporte</option>
@@ -2624,6 +2832,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_document_number", e.target.value)}
             className={inputClass(errors, "rep_document_number")}
             data-campo={"rep_document_number"}
+            data-requerido={requerido("rep_document_number")}
             placeholder="0000000000"
             maxLength={datos.rep_document_type === "cedula" ? 10 : 13}
           />
@@ -2645,6 +2854,7 @@ const FormularioEmpresa = ({
             }
             className={inputClass(errors, "rep_names")}
             data-campo={"rep_names"}
+            data-requerido={requerido("rep_names")}
             maxLength={largoMax("rep_names")}
             placeholder="NOMBRES"
           />
@@ -2664,6 +2874,7 @@ const FormularioEmpresa = ({
             }
             className={inputClass(errors, "rep_last_names")}
             data-campo={"rep_last_names"}
+            data-requerido={requerido("rep_last_names")}
             maxLength={largoMax("rep_last_names")}
             placeholder="APELLIDOS"
           />
@@ -2680,6 +2891,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_gender", e.target.value)}
             className={inputClass(errors, "rep_gender")}
             data-campo={"rep_gender"}
+            data-requerido={requerido("rep_gender")}
           >
             <option value="">Seleccione</option>
             <option value="masculino">Masculino</option>
@@ -2699,6 +2911,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_position", e.target.value)}
             className={inputClass(errors, "rep_position")}
             data-campo={"rep_position"}
+            data-requerido={requerido("rep_position")}
             maxLength={largoMax("rep_position")}
             placeholder="Ej: Gerente General"
           />
@@ -2718,6 +2931,7 @@ const FormularioEmpresa = ({
             }
             className={inputClass(errors, "rep_nationality")}
             data-campo={"rep_nationality"}
+            data-requerido={requerido("rep_nationality")}
             maxLength={largoMax("rep_nationality")}
             placeholder="ecuatoriana"
           />
@@ -2737,6 +2951,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_birth_date", e.target.value)}
             className={inputClass(errors, "rep_birth_date")}
             data-campo={"rep_birth_date"}
+            data-requerido={requerido("rep_birth_date")}
             maxLength={largoMax("rep_birth_date")}
           />
           {errors.rep_birth_date && (
@@ -2753,6 +2968,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_email", e.target.value)}
             className={inputClass(errors, "rep_email")}
             data-campo={"rep_email"}
+            data-requerido={requerido("rep_email")}
             maxLength={largoMax("rep_email")}
             placeholder="rep@empresa.com"
           />
@@ -2770,6 +2986,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_phone", e.target.value)}
             className={inputClass(errors, "rep_phone")}
             data-campo={"rep_phone"}
+            data-requerido={requerido("rep_phone")}
             placeholder="0987654321"
             maxLength={10}
           />
@@ -2787,6 +3004,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_occupation", e.target.value)}
             className={inputClass(errors, "rep_occupation")}
             data-campo={"rep_occupation"}
+            data-requerido={requerido("rep_occupation")}
             maxLength={largoMax("rep_occupation")}
             placeholder="Ej: empresario"
           />
@@ -2804,6 +3022,7 @@ const FormularioEmpresa = ({
             onChange={(e) => onChange("rep_profession", e.target.value)}
             className={inputClass(errors, "rep_profession")}
             data-campo={"rep_profession"}
+            data-requerido={requerido("rep_profession")}
             maxLength={largoMax("rep_profession")}
             placeholder="Ej: Ingeniero"
           />
@@ -2820,6 +3039,7 @@ const FormularioEmpresa = ({
         errors={errors}
         prefijo="rep_"
         titulo="Dirección del Representante Legal"
+        numeroObligatorio
       />
       <SeccionUAFE
         datos={datos}
@@ -2862,9 +3082,14 @@ const prepararUAFE = (datos, p = "") => {
   const val = (campo) => datos[`${p}${campo}`] || null;
 
   return {
-    [`${p}origen_fondos`]: datos[`${p}rol_tramite`]
-      ? construirOrigenFondosTexto(datos, p) || null
-      : null,
+    [`${p}origen_fondos`]:
+      datos[`${p}rol_tramite`] && datos[`${p}rol_tramite`] !== "otro"
+        ? construirOrigenFondosTexto(datos, p) || null
+        : null,
+    [`${p}rol_tramite_otro`]:
+      datos[`${p}rol_tramite`] === "otro"
+        ? (datos[`${p}rol_tramite_otro`] || "").trim() || null
+        : null,
     [`${p}actividad_economica_otra`]:
       datos[`${p}actividad_economica`] === "otro"
         ? (datos[`${p}actividad_economica_otra`] || "").trim() || null
@@ -2914,7 +3139,6 @@ const validarPersona = (datos, prefijo = "") => {
   if (!datos[`${p}phone`]) e[`${p}phone`] = "Requerido";
   if (!datos[`${p}province`]) e[`${p}province`] = "Requerido";
   if (!datos[`${p}canton`]) e[`${p}canton`] = "Requerido";
-  if (!datos[`${p}parroquia`]) e[`${p}parroquia`] = "Requerido";
   if (!datos[`${p}main_street`]) e[`${p}main_street`] = "Requerido";
   if (!datos[`${p}secondary_street`]) e[`${p}secondary_street`] = "Requerido";
   if (!datos[`${p}occupation`]) e[`${p}occupation`] = "Requerido";
@@ -2974,16 +3198,24 @@ const validarPatrimonio = (datos, p = "", obligatoria = false) => {
     pat.vehiculos.forEach((veh, i) => {
       if (!empezada(veh)) return;
       if (vacio(veh.marca)) e[k(`vehiculos_${i}_marca`)] = "Requerido";
-      if (vacio(veh.modelo)) e[k(`vehiculos_${i}_modelo`)] = "Requerido";
-      if (vacio(veh.placa)) e[k(`vehiculos_${i}_placa`)] = "Requerido";
-      else if (!/^[A-Z0-9-]{5,10}$/i.test(veh.placa.trim()))
+      if (!vacio(veh.placa) && !/^[A-Z0-9-]{5,10}$/i.test(veh.placa.trim()))
         e[k(`vehiculos_${i}_placa`)] = "Placa inválida.";
       if (vacio(veh.valor)) e[k(`vehiculos_${i}_valor`)] = "Requerido";
     });
   }
 
-  if (obligatoria && !pat.no_posee_inversiones && vacio(pat.inversiones))
-    e[k("inversiones")] = "Indique las entidades o marque que no posee.";
+  if (!pat.no_posee_inversiones) {
+    const inversiones = inversionesComoLista(pat.inversiones);
+    faltan(inversiones, [
+      "inversiones",
+      "Agregue las inversiones, pólizas o fideicomisos o marque que no posee.",
+    ]);
+    inversiones.forEach((inv, i) => {
+      if (!empezada(inv)) return;
+      if (vacio(inv.descripcion))
+        e[k(`inversiones_${i}_descripcion`)] = "Requerido";
+    });
+  }
 
   if (!pat.no_posee_acciones) {
     const acciones = pat.acciones || [];
@@ -3036,7 +3268,10 @@ const validarUAFE = (datos, prefijo = "", validarOrigen = false) => {
   if (!datos[`${p}ingreso_mensual`]) e[`${p}ingreso_mensual`] = "Requerido";
   if (validarOrigen) {
     if (!datos[`${p}rol_tramite`]) e[`${p}rol_tramite`] = "Requerido";
-    else e = { ...e, ...validarOrigenFondos(datos, p) };
+    else if (datos[`${p}rol_tramite`] === "otro") {
+      if (!(datos[`${p}rol_tramite_otro`] || "").trim())
+        e[`${p}rol_tramite_otro`] = "Describa la forma en la que participa.";
+    } else e = { ...e, ...validarOrigenFondos(datos, p) };
   }
   if (!datos[`${p}es_pep`]) e[`${p}es_pep`] = "Requerido";
   if (datos[`${p}es_pep`] === "si")
@@ -3098,7 +3333,6 @@ const validarEmpresa = (datos) => {
   if (!datos.phone) e.phone = "Requerido";
   if (!datos.province) e.province = "Requerido";
   if (!datos.canton) e.canton = "Requerido";
-  if (!datos.parroquia) e.parroquia = "Requerido";
   if (!datos.main_street) e.main_street = "Requerido";
   if (!datos.secondary_street) e.secondary_street = "Requerido";
   if (!datos.number_street) e.number_street = "Requerido";
@@ -3106,7 +3340,15 @@ const validarEmpresa = (datos) => {
   if (!datos.ingreso_mensual) e.ingreso_mensual = "Requerido";
   if (!datos.egreso_mensual) e.egreso_mensual = "Requerido";
   if (!datos.rol_tramite) e.rol_tramite = "Requerido";
-  const errorsOrigen = datos.rol_tramite ? validarOrigenFondos(datos, "") : {};
+  else if (
+    datos.rol_tramite === "otro" &&
+    !(datos.rol_tramite_otro || "").trim()
+  )
+    e.rol_tramite_otro = "Describa la forma en la que participa la empresa.";
+  const errorsOrigen =
+    datos.rol_tramite && datos.rol_tramite !== "otro"
+      ? validarOrigenFondos(datos, "")
+      : {};
   const errorsSocios = validarSocios(datos);
   const errorsPatrimonio = validarPatrimonio(datos, "", true);
   const errorsRep = validarPersona(datos, "rep_");
@@ -3261,7 +3503,8 @@ const FormularioRegistro = ({
     if (
       mismaDir &&
       esCasadoTitular &&
-      calidadParticipacion === "propios_derechos"
+      calidadParticipacion &&
+      calidadParticipacion !== "representando"
     ) {
       setConyugue((prev) => ({
         ...prev,
@@ -3487,9 +3730,14 @@ const FormularioRegistro = ({
           rep_rol_tramite: null,
           rep_origen_fondos: null,
           patrimonio: limpiarPatrimonio(empresa.patrimonio),
-          origen_fondos: empresa.rol_tramite
-            ? construirOrigenFondosTexto(empresa, "") || null
-            : null,
+          origen_fondos:
+            empresa.rol_tramite && empresa.rol_tramite !== "otro"
+              ? construirOrigenFondosTexto(empresa, "") || null
+              : null,
+          rol_tramite_otro:
+            empresa.rol_tramite === "otro"
+              ? (empresa.rol_tramite_otro || "").trim() || null
+              : null,
           controlada_supercias: esControlada,
           socios_modalidad: modalidad,
           socios: sociosValidos,
@@ -3603,7 +3851,7 @@ const FormularioRegistro = ({
   };
 
   return (
-    <div ref={inicioRef} className="scroll-mt-4">
+    <div ref={inicioRef} className="form-registro scroll-mt-4">
       <div className="max-w-2xl mx-auto">
         {/* ENCABEZADO */}
         {encabezado && (
@@ -3753,7 +4001,7 @@ const FormularioRegistro = ({
             <>
               {/* CALIDAD DE PARTICIPACIÓN */}
               <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="requerido block text-sm font-medium text-gray-700">
                   Calidad en la que participa en el trámite
                 </label>
                 <div className="flex flex-col gap-2">
@@ -3873,7 +4121,7 @@ const FormularioRegistro = ({
               {/* ¿EL REPRESENTADO ES SU CÓNYUGE? — solo para propios_y_representando */}
               {calidadParticipacion === "propios_y_representando" && (
                 <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="requerido block text-sm font-medium text-gray-700">
                     ¿El representado es su cónyuge?
                   </label>
                   <div className="flex gap-3">

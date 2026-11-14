@@ -85,6 +85,7 @@ class DeclaracionUAFE(Base):
 
     # Participación en el trámite
     rol_tramite = Column(enum_column_type(RolTramite, "rol_tramite"), nullable=True)
+    rol_tramite_otro = Column(String(200), nullable=True)
     calidad_participacion = Column(
         enum_column_type(CalidadParticipacion, "calidad_participacion"), nullable=True
     )

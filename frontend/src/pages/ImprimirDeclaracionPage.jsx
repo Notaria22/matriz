@@ -27,7 +27,7 @@ const ImprimirDeclaracionPage = () => {
   }, [tipo, documento]);
 
   useEffect(() => {
-    document.title = `Declaración ${documento}`;
+    document.title = `formulario-UAFE-notaria22UIO-${documento}`;
   }, [documento]);
 
   if (error) {
@@ -48,7 +48,7 @@ const ImprimirDeclaracionPage = () => {
           onClick={() => window.print()}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
         >
-          <Printer className="w-4 h-4" /> Imprimir
+          <Printer className="w-4 h-4" /> Descargar / Imprimir
         </button>
       </div>
       <div className="max-w-3xl mx-auto p-8 print:px-1 print:py-0 print:max-w-none">

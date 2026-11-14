@@ -20,7 +20,7 @@ class CompanyBase(BaseModel):
     # Dirección empresa
     province: str = Field(..., min_length=2, max_length=50)
     canton: str = Field(..., min_length=2, max_length=50)
-    parroquia: str = Field(..., min_length=2, max_length=50)
+    parroquia: Optional[str] = Field(None, max_length=50)
     sector: str = Field(..., min_length=2, max_length=100)
     main_street: str = Field(..., min_length=2, max_length=150)
     secondary_street: str = Field(..., min_length=2, max_length=150)
@@ -39,7 +39,7 @@ class CompanyBase(BaseModel):
     rep_phone: str = Field(..., min_length=9, max_length=15)
     rep_province: str = Field(..., min_length=2, max_length=50)
     rep_canton: str = Field(..., min_length=2, max_length=50)
-    rep_parroquia: str = Field(..., min_length=2, max_length=50)
+    rep_parroquia: Optional[str] = Field(None, max_length=50)
     rep_sector: str = Field(..., min_length=2, max_length=100)
     rep_main_street: str = Field(..., min_length=2, max_length=150)
     rep_secondary_street: str = Field(..., min_length=2, max_length=150)
@@ -53,7 +53,8 @@ class CompanyBase(BaseModel):
     ingreso_mensual: Optional[Decimal] = None
     egreso_mensual: Optional[Decimal] = None
     actividad_empresa: Optional[str] = Field(None, max_length=200)
-    rol_tramite: Optional[str] = Field(None, pattern="^(vendedor|adquirente)$")
+    rol_tramite: Optional[str] = Field(None, pattern="^(vendedor|adquirente|otro)$")
+    rol_tramite_otro: Optional[str] = Field(None, max_length=200)
     origen_fondos: Optional[str] = Field(None, max_length=3000)
 
     # Socios / accionistas
@@ -85,6 +86,16 @@ class CompanyBase(BaseModel):
     rep_pep_fecha_fin: Optional[date] = None
     rep_patrimonio: Optional[dict[str, Any]] = None
     patrimonio: Optional[dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def validar_rol_otro(self):
+        if self.rol_tramite == "otro":
+            if not (self.rol_tramite_otro or "").strip():
+                raise ValueError("Describa la forma en la que participa en el trámite")
+            self.origen_fondos = None
+        else:
+            self.rol_tramite_otro = None
+        return self
 
     @model_validator(mode="after")
     def validar_actividad_otra_rep(self):

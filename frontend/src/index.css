@@ -139,3 +139,10 @@ body {
     overflow: visible !important;
   }
 }
+
+/* Formulario de registro: asterisco rojo en los campos obligatorios */
+.form-registro label:has(+ [data-requerido])::after,
+.form-registro label.requerido::after {
+  content: " *";
+  color: #ef4444;
+}

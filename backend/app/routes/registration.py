@@ -209,7 +209,9 @@ def _errores_de(e: ValidationError, prefijo: str, seccion: str) -> list[dict]:
         campo = loc[0] if loc else ""
         mensaje = _mensaje_es(err)
         # Errores de todo el modelo (sin campo): ubicarlos en el campo que corresponde
-        if not campo and "actividad económica" in mensaje.lower():
+        if not campo and "forma en la que participa" in mensaje.lower():
+            campo = "rol_tramite_otro"
+        elif not campo and "actividad económica" in mensaje.lower():
             campo = "rep_actividad_economica_otra" if "representante" in mensaje.lower() else "actividad_economica_otra"
         errores.append({
             "campo": f"{prefijo}{campo}" if campo else "",
@@ -232,14 +234,18 @@ def _error_400(errores: list[dict]) -> HTTPException:
 
 _FILAS_PATRIMONIO = {
     "inmuebles": (("tipo", "ciudad", "valor"), "Agregue los inmuebles o marque que no posee."),
-    "vehiculos": (("marca", "modelo", "placa", "valor"), "Agregue los vehículos o marque que no posee."),
+    "vehiculos": (("marca", "valor"), "Agregue los vehículos o marque que no posee."),
+    "inversiones": (("descripcion",), "Agregue las inversiones, pólizas o fideicomisos o marque que no posee."),
     "acciones": (("entidad", "monto"), "Agregue las inversiones o marque que no posee."),
 }
 
 
 def _errores_patrimonio(pat, prefijo: str, seccion: str, obligatoria: bool) -> list[dict]:
     """Filas empezadas deben estar completas; si es obligatoria, cada parte se declara o se marca 'no posee'."""
-    pat = pat or {}
+    pat = dict(pat or {})
+    if isinstance(pat.get("inversiones"), str):
+        texto = pat["inversiones"].strip()
+        pat["inversiones"] = [{"descripcion": texto}] if texto else []
     errores = []
 
     def error(campo, mensaje):
@@ -248,17 +254,16 @@ def _errores_patrimonio(pat, prefijo: str, seccion: str, obligatoria: bool) -> l
     for lista, (campos, mensaje) in _FILAS_PATRIMONIO.items():
         if pat.get(f"no_posee_{lista}"):
             continue
-        filas = [f for f in (pat.get(lista) or []) if any(str(v or "").strip() for v in f.values())]
+        todas = [f for f in (pat.get(lista) or []) if isinstance(f, dict)]
+        filas = [f for f in todas if any(str(v or "").strip() for v in f.values())]
         if obligatoria and not filas:
             error(lista, mensaje)
-        for i, fila in enumerate(pat.get(lista) or []):
+        for i, fila in enumerate(todas):
             if fila not in filas:
                 continue
             for c in campos:
                 if not str(fila.get(c) or "").strip():
                     error(f"{lista}_{i}_{c}", "Este campo es obligatorio.")
-    if obligatoria and not pat.get("no_posee_inversiones") and not str(pat.get("inversiones") or "").strip():
-        error("inversiones", "Indique las entidades o marque que no posee.")
     return errores
 
 

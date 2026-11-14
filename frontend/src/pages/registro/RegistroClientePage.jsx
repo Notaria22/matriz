@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
+import { Download } from "lucide-react";
 import FormularioRegistro from "../../components/registro/FormularioRegistro";
+import VistaRegistro from "../../components/registro/VistaRegistro";
 import { errorDeApi } from "../../utils/erroresApi";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -9,7 +11,7 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const RegistroClientePage = () => {
   const { token } = useParams();
   const [tokenInfo, setTokenInfo] = useState(null); // null = verificando
-  const [enviado, setEnviado] = useState(false);
+  const [enviado, setEnviado] = useState(null); // registro enviado
 
   useEffect(() => {
     const verificar = async () => {
@@ -47,7 +49,15 @@ const RegistroClientePage = () => {
         "Error al guardar los datos. Intente nuevamente.",
       );
     }
-    setEnviado(true);
+    setEnviado({
+      tipo: payload.tipo,
+      origen: "formulario_publico",
+      fecha: new Date().toISOString(),
+      acepta_condiciones: payload.acepta_condiciones,
+      acepta_privacidad: payload.acepta_privacidad,
+      payload,
+    });
+    document.title = `formulario-UAFE-notaria22UIO-${tokenInfo.documento}`;
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -78,17 +88,33 @@ const RegistroClientePage = () => {
   }
   if (enviado) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="bg-white rounded-xl shadow-md p-8 max-w-md w-full text-center">
-          <h1 className="text-xl font-bold text-gray-900 mb-2">
-            ¡Datos registrados!
-          </h1>
-          <p className="text-gray-600">
-            Sus datos han sido guardados correctamente. Al momento de su cita,
-            el personal de la notaría ya tendrá su información disponible.
-          </p>
+      <>
+        <div className="no-print min-h-screen flex items-center justify-center bg-gray-50 px-4">
+          <div className="bg-white rounded-xl shadow-md p-8 max-w-md w-full text-center">
+            <h1 className="text-xl font-bold text-gray-900 mb-2">
+              ¡Datos registrados!
+            </h1>
+            <p className="text-gray-600">
+              Sus datos han sido guardados correctamente. Al momento de su cita,
+              el personal de la notaría ya tendrá su información disponible.
+            </p>
+            <p className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm font-medium text-amber-800">
+              Por favor descargue el formulario, imprímalo y fírmelo
+              físicamente.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+            >
+              <Download className="w-4 h-4" /> Descargar formulario
+            </button>
+          </div>
         </div>
-      </div>
+        <div className="hidden print:block">
+          <VistaRegistro registro={enviado} imprimible />
+        </div>
+      </>
     );
   }
 

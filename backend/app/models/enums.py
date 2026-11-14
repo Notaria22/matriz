@@ -69,6 +69,7 @@ class OrigenDeclaracion(enum.Enum):
 class RolTramite(enum.Enum):
     vendedor = "vendedor"
     adquirente = "adquirente"
+    otro = "otro"  # se describe en rol_tramite_otro
 
 
 class CalidadParticipacion(enum.Enum):

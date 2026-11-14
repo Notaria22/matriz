@@ -152,14 +152,17 @@ const Patrimonio = ({ pat, quien = "DECLARANTE" }) => {
             .join(" — ")
         }
       />
-      <Campo
-        etiqueta="Inversiones, pólizas, fondos de acumulación o fideicomisos"
-        valor={
-          pat.no_posee_inversiones
-            ? "No posee"
-            : pat.inversiones || "No declarado"
+      <Lista
+        titulo="Inversiones, pólizas, fondos de acumulación o fideicomisos"
+        filas={
+          Array.isArray(pat.inversiones)
+            ? pat.inversiones
+            : pat.inversiones
+              ? [{ descripcion: pat.inversiones }]
+              : []
         }
-        ancho
+        noPosee={pat.no_posee_inversiones}
+        render={(i) => i.descripcion}
       />
       <Lista
         titulo="Acciones, participaciones o capital invertido en empresas"
@@ -223,11 +226,13 @@ const UAFE = ({
           valor={
             p === "rep_"
               ? "Representante legal de la empresa"
-              : ROLES_TRAMITE[rol] || rol
+              : rol === "otro"
+                ? d[`${p}rol_tramite_otro`]
+                : ROLES_TRAMITE[rol] || rol
           }
           ancho
         />
-        {p !== "rep_" && (
+        {p !== "rep_" && rol !== "otro" && (
           <Campo
             etiqueta={
               rol === "adquirente"

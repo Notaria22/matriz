@@ -27,7 +27,7 @@ class Company(Base):
     # Dirección
     province = Column(String(50), nullable=False)
     canton = Column(String(50), nullable=False)
-    parroquia = Column(String(50), nullable=False)
+    parroquia = Column(String(50), nullable=True)
     sector = Column(String(100), nullable=True)
     main_street = Column(String(150), nullable=False)
     secondary_street = Column(String(150), nullable=False)

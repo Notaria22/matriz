@@ -40,6 +40,10 @@ const ORIGEN = {
 };
 
 const ROL = { vendedor: "Vendedor / transferente", adquirente: "Adquirente" };
+const rolDe = (d) =>
+  d.rol_tramite === "otro"
+    ? d.rol_tramite_otro || "Otra forma"
+    : ROL[d.rol_tramite] || d.rol_tramite;
 
 const formatoFecha = (iso) =>
   iso
@@ -184,7 +188,7 @@ const DetalleDeclaracion = ({ id }) => {
         "Rol en el trámite",
         data.es_representante_legal
           ? `Representante legal de ${data.empresa?.razon_social || "la empresa"}`
-          : ROL[data.rol_tramite] || data.rol_tramite,
+          : rolDe(data),
       )}
       {fila(
         "Actividad económica",
@@ -288,8 +292,7 @@ const HistorialUAFE = ({
                       {ORIGEN[d.origen] || d.origen}
                       {d.es_representante_legal
                         ? ` · Representante legal de ${d.empresa?.razon_social || "la empresa"}`
-                        : d.rol_tramite &&
-                          ` · ${ROL[d.rol_tramite] || d.rol_tramite}`}
+                        : d.rol_tramite && ` · ${rolDe(d)}`}
                       {d.es_pep && " · PEP"}
                       {d.es_pep_indirecto && " · Relacionado con PEP"}
                     </p>

@@ -36,7 +36,7 @@ def _uafe_persona(decl) -> dict:
         "ingreso_mensual", "origen_fondos",
         "es_pep", "es_pep_indirecto", "pep_nombre", "pep_institucion", "pep_cargo",
         "pep_fecha_inicio", "pep_grado_relacion", "pep_relacion_tipo", "pep_ya_no_ejerce",
-        "pep_fecha_fin", "situacion_patrimonial", "rol_tramite", "calidad_participacion",
+        "pep_fecha_fin", "situacion_patrimonial", "rol_tramite", "rol_tramite_otro", "calidad_participacion",
         "conyugue_comparece", "razon_exclusion_conyugue",
     ]
     bloque = {c: d.get(c) for c in campos}
@@ -147,7 +147,9 @@ def consultar_uafe(
                 "egreso_mensual": d.get("egreso_mensual"),
                 "actividad_economica": d.get("actividad_economica"),
                 "rol_tramite": d.get("rol_tramite"),
+                "rol_tramite_otro": d.get("rol_tramite_otro"),
                 "origen_fondos": d.get("origen_fondos"),
+                "situacion_patrimonial": d.get("situacion_patrimonial"),
                 "fecha_declaracion": d.get("fecha"),
             },
             "socios": {

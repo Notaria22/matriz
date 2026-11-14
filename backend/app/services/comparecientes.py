@@ -39,7 +39,7 @@ PARTY_IDENTIDAD = [
 ]
 
 UAFE_PERSONA = [
-    "actividad_economica", "actividad_economica_otra", "empresa_trabajo", "ingreso_mensual", "rol_tramite",
+    "actividad_economica", "actividad_economica_otra", "empresa_trabajo", "ingreso_mensual", "rol_tramite", "rol_tramite_otro",
     "origen_fondos", "es_pep", "es_pep_indirecto", "pep_nombre",
     "pep_institucion", "pep_fecha_inicio", "pep_cargo", "pep_grado_relacion",
     "pep_relacion_tipo", "pep_ya_no_ejerce", "pep_fecha_fin", "patrimonio",
@@ -52,7 +52,7 @@ COMPANY_IDENTIDAD = [
 ]
 
 UAFE_EMPRESA = [
-    "ingreso_mensual", "egreso_mensual", "actividad_empresa", "rol_tramite",
+    "ingreso_mensual", "egreso_mensual", "actividad_empresa", "rol_tramite", "rol_tramite_otro",
     "origen_fondos", "controlada_supercias", "referencia_supercias",
     "socios_modalidad", "autoriza_consulta_supercias", "patrimonio",
 ]
@@ -312,6 +312,7 @@ def _resumen_declaracion(decl: DeclaracionUAFE) -> dict:
         "fecha": decl.fecha.isoformat() if decl.fecha else None,
         "origen": decl.origen.value,
         "rol_tramite": _valor_json(decl.rol_tramite),
+        "rol_tramite_otro": decl.rol_tramite_otro,
         "origen_fondos": decl.origen_fondos,
         "es_pep": decl.es_pep,
         "es_pep_indirecto": decl.es_pep_indirecto,
