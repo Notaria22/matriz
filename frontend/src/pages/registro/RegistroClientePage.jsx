@@ -99,8 +99,7 @@ const RegistroClientePage = () => {
               el personal de la notaría ya tendrá su información disponible.
             </p>
             <p className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm font-medium text-amber-800">
-              Por favor descargue el formulario, imprímalo y fírmelo
-              físicamente.
+              Descargue el formulario y fírmelo física o electrónicamente.
             </p>
             <button
               type="button"
