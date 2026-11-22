@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   BuscadorPlantillas,
   ModalGuardarPlantilla,
+  useBorradorDeUrl,
 } from "../../../components/plantillas";
 import { Button, Card, RichTextEditor } from "../../../components/shared";
 import { ComparecienteInline } from "../../../components/comparecientes";
@@ -9,6 +10,7 @@ import { SeccionFormularioRedactar } from "../../../components/minutas";
 import { useToast } from "../../../hooks/useToast";
 import { apiFetch } from "../../../config/api";
 import API_CONFIG from "../../../config/api";
+import { descargarRespuesta } from "../../../utils/descargas";
 
 const AclaratoriaHistoriaItem = ({
   aclaratoria,
@@ -847,6 +849,7 @@ const FormularioCompraventa = () => {
   const [loading, setLoading] = useState(false);
   const [modalPlantillaAbierto, setModalPlantillaAbierto] = useState(false);
   const [plantillaKey, setPlantillaKey] = useState(0);
+  const [borrador, setBorrador] = useState(null); // { id, codigo, nombre }
   const [vendedores, setVendedores] = useState([]);
   const [compradores, setCompradores] = useState([]);
 
@@ -1165,7 +1168,13 @@ const FormularioCompraventa = () => {
   // ============================================
   // FUNCIÓN - CARGAR PLANTILLA
   // ============================================
-  const handleCargarPlantilla = (contenido) => {
+  const handleCargarPlantilla = (contenido, guardado = null) => {
+    if (guardado)
+      setBorrador({
+        id: guardado.id,
+        codigo: guardado.codigo,
+        nombre: guardado.nombre,
+      });
     if (contenido.vendedores !== undefined) setVendedores(contenido.vendedores);
     if (contenido.compradores !== undefined)
       setCompradores(contenido.compradores);
@@ -1209,6 +1218,8 @@ const FormularioCompraventa = () => {
     if (contenido.abogado !== undefined) setAbogado(contenido.abogado);
     setPlantillaKey((k) => k + 1);
   };
+
+  useBorradorDeUrl(handleCargarPlantilla);
 
   const handleAgregarVendedor = () => setVendedores([...vendedores, null]);
   const handleVendedorReady = (index, data) => {
@@ -1820,15 +1831,7 @@ const FormularioCompraventa = () => {
       });
 
       if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `minuta_${Date.now()}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        await descargarRespuesta(response, "minuta.docx");
         toast.success("Minuta generada exitosamente");
       } else {
         let data = null;
@@ -1869,16 +1872,23 @@ const FormularioCompraventa = () => {
         {/* BUSCADOR DE PLANTILLAS */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p className="text-sm font-medium text-amber-800 mb-2">
-            Cargar desde plantilla
+            Cargar borrador
           </p>
           <BuscadorPlantillas
             tipoDocumento="minuta"
             tipoContrato="compraventa"
             onCargar={handleCargarPlantilla}
           />
+          {borrador && (
+            <p className="text-sm text-amber-900 mt-3">
+              Editando el borrador{" "}
+              <span className="font-mono font-semibold">{borrador.codigo}</span>{" "}
+              · {borrador.nombre}
+            </p>
+          )}
           <p className="text-xs text-amber-600 mt-2">
-            Busca por nombre de proyecto o vendedor. Al seleccionar una
-            plantilla se cargarán todos los datos del formulario.
+            Busca por código, nombre del borrador, vendedor o cédula. Al
+            seleccionar un borrador se cargan todos los datos del formulario.
           </p>
         </div>
       </div>
@@ -5280,7 +5290,7 @@ const FormularioCompraventa = () => {
             onClick={() => setModalPlantillaAbierto(true)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
           >
-            Guardar como plantilla
+            {borrador ? "Guardar borrador" : "Guardar como borrador"}
           </button>
           <Button
             variant="primary"
@@ -5297,10 +5307,16 @@ const FormularioCompraventa = () => {
       <ModalGuardarPlantilla
         abierto={modalPlantillaAbierto}
         onCerrar={() => setModalPlantillaAbierto(false)}
-        onGuardado={() => {
+        onGuardado={(data) => {
           setModalPlantillaAbierto(false);
-          toast.success("Plantilla guardada correctamente");
+          setBorrador({
+            id: data.id,
+            codigo: data.codigo,
+            nombre: data.nombre,
+          });
+          toast.success(`Borrador ${data.codigo} guardado`);
         }}
+        borrador={borrador}
         tipoDocumento="minuta"
         tipoContrato="compraventa"
         nombreVendedor={(() => {

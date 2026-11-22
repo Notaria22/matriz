@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Save } from "lucide-react";
 import { apiFetch } from "../../config/api";
 
@@ -12,6 +12,7 @@ import { apiFetch } from "../../config/api";
  *   tipoContrato    — 'compraventa' | 'promesa' | 'poder'
  *   contenido       — objeto completo del formulario
  *   nombreVendedor  — string extraído automáticamente del primer vendedor
+ *   borrador        — { id, codigo, nombre } si se está editando un borrador ya guardado
  */
 const ModalGuardarPlantilla = ({
   abierto,
@@ -21,8 +22,13 @@ const ModalGuardarPlantilla = ({
   tipoContrato,
   contenido,
   nombreVendedor,
+  borrador = null,
 }) => {
   const [nombre, setNombre] = useState("");
+
+  useEffect(() => {
+    if (abierto) setNombre(borrador?.nombre || "");
+  }, [abierto, borrador]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,7 +36,7 @@ const ModalGuardarPlantilla = ({
 
   const handleGuardar = async () => {
     if (!nombre.trim()) {
-      setError("Ingresa un nombre para la plantilla");
+      setError("Ingresa un nombre para el borrador");
       return;
     }
 
@@ -38,23 +44,31 @@ const ModalGuardarPlantilla = ({
     setGuardando(true);
 
     try {
-      const response = await apiFetch("/api/templates/", {
-        method: "POST",
-        body: JSON.stringify({
-          nombre: nombre.trim(),
-          nombre_vendedor: nombreVendedor || "Sin vendedor",
-          tipo_contrato: tipoContrato,
-          tipo_documento: tipoDocumento,
-          contenido,
-        }),
-      });
+      const datos = {
+        nombre: nombre.trim(),
+        nombre_vendedor: nombreVendedor || "Sin vendedor",
+        contenido,
+      };
+      const response = borrador
+        ? await apiFetch(`/api/templates/${borrador.id}`, {
+            method: "PUT",
+            body: JSON.stringify(datos),
+          })
+        : await apiFetch("/api/templates/", {
+            method: "POST",
+            body: JSON.stringify({
+              ...datos,
+              tipo_contrato: tipoContrato,
+              tipo_documento: tipoDocumento,
+            }),
+          });
 
+      const data = await response.json();
       if (response.ok) {
         setNombre("");
-        onGuardado();
+        onGuardado(data);
       } else {
-        const data = await response.json();
-        setError(data.detail || "Error al guardar la plantilla");
+        setError(data.detail || "Error al guardar el borrador");
       }
     } catch (err) {
       setError("Error de conexión", err);
@@ -82,7 +96,9 @@ const ModalGuardarPlantilla = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-lg font-semibold text-gray-900">
-            Guardar como plantilla
+            {borrador
+              ? `Guardar borrador ${borrador.codigo}`
+              : "Guardar como borrador"}
           </h3>
           <button
             onClick={handleCerrar}
@@ -105,7 +121,7 @@ const ModalGuardarPlantilla = ({
         {/* Campo nombre */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre de la plantilla
+            Nombre del borrador
           </label>
           <input
             type="text"

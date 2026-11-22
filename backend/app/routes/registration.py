@@ -1,4 +1,6 @@
 import copy
+import re
+import unicodedata
 import uuid
 import logging
 from dataclasses import dataclass
@@ -50,13 +52,14 @@ def generar_token(
     """Genera un link para un documento concreto (cédula/pasaporte o RUC del titular)."""
     token_str = str(uuid.uuid4())
     expira_en = datetime.now(timezone.utc) + timedelta(hours=72)
-    link = f"{settings.FRONTEND_URL.rstrip('/')}/registro/{token_str}"
+    link = f"{settings.FRONTEND_URL.rstrip('/')}/registro/{_slug(datos.nombre)}-{token_str}"
 
     token = RegistrationToken(
         token=token_str,
         link=link,
         tipo_esperado=TipoSujeto(datos.tipo),
         documento_esperado=datos.documento,
+        nombre_compareciente=datos.nombre,
         expira_en=expira_en,
         creado_por=current_user.id,
     )
@@ -70,6 +73,7 @@ def generar_token(
         creado_por=current_user.username,
         tipo=datos.tipo,
         documento=datos.documento,
+        nombre=datos.nombre,
     )
 
 
@@ -93,6 +97,7 @@ def listar_tokens(
             usado_en=t.usado_en,
             tipo_esperado=t.tipo_esperado.value,
             documento_esperado=t.documento_esperado,
+            nombre_compareciente=t.nombre_compareciente,
             creado_en=t.creado_en,
             expira_en=t.expira_en,
             creado_por=username,
@@ -120,8 +125,16 @@ def eliminar_token(
 # ENDPOINTS PÚBLICOS (sin login)
 # ============================================
 
+def _slug(nombre: str) -> str:
+    """'MARÍA JOSÉ PÉREZ' -> 'maria-jose-perez' (para que el link diga de quién es)."""
+    sin_tildes = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", sin_tildes.lower()).strip("-")[:60].rstrip("-") or "cliente"
+
+
 def _token_vigente(token: str, db: Session):
     """Devuelve el token si existe, no se usó y no expiró; si no, None."""
+    # El link es <nombre>-<token>; los links anteriores son solo el token
+    token = token[-36:]
     token_obj = db.query(RegistrationToken).filter(RegistrationToken.token == token).first()
     if not token_obj or token_obj.usado:
         return None

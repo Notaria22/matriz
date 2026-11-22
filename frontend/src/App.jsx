@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import GestionUsuariosPage from "./pages/GestionUsuariosPage";
 import ComparecientesPage from "./pages/ComparecientesPage";
+import ArchivoPage from "./pages/ArchivoPage";
 import ImprimirDeclaracionPage from "./pages/ImprimirDeclaracionPage";
 import { useAuth } from "./context/AuthContext";
 import TestInlinePage from "./pages/TestInlinePage";
@@ -74,6 +75,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <ComparecientesPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/archivo"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ArchivoPage />
               </MainLayout>
             </ProtectedRoute>
           }

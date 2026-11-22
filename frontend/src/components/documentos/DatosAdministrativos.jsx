@@ -24,23 +24,25 @@ const TIPOS_CONTRATO = {
   donacion: "Donación",
 };
 
-const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
+const DatosAdministrativos = ({
+  onChange,
+  tipoContrato = "compraventa",
+  initialData = null, // datos guardados en un borrador
+}) => {
   const { user } = useAuth();
-  const [showConcuerdo, setShowConcuerdo] = useState(false);
+  const [showConcuerdo, setShowConcuerdo] = useState(
+    Boolean(initialData?.needsConcuerdo),
+  );
 
   const [formData, setFormData] = useState({
-    notarioKey: "",
-    accionPersonal: "",
+    notarioKey: initialData?.notarioKey || "",
+    accionPersonal: initialData?.accionPersonal || "",
     matrizador: user?.iniciales || "",
-    numeroProtocolo: "",
+    numeroProtocolo: initialData?.numeroProtocolo || "",
     tipoContrato: tipoContrato,
-    cuantia: "",
-    fechaEscritura: new Date().toISOString().split("T")[0],
-    concuerdoNumeroProtocolo: "",
-    concuerdoNombres: "",
-    concuerdoApellidos: "",
-    concuerdoCedula: "",
-    concuerdoFecha: new Date().toISOString().split("T")[0],
+    cuantia: initialData?.cuantia ?? "",
+    fechaEscritura:
+      initialData?.fechaEscritura || new Date().toISOString().split("T")[0],
   });
 
   const [errors, setErrors] = useState({});
@@ -76,22 +78,7 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
     }
   };
 
-  const handleToggleConcuerdo = () => {
-    setShowConcuerdo((prev) => {
-      const newState = !prev;
-      if (!newState) {
-        setFormData((prev) => ({
-          ...prev,
-          concuerdoNumeroProtocolo: "",
-          concuerdoNombres: "",
-          concuerdoApellidos: "",
-          concuerdoCedula: "",
-          concuerdoFecha: new Date().toISOString().split("T")[0],
-        }));
-      }
-      return newState;
-    });
-  };
+  const handleToggleConcuerdo = () => setShowConcuerdo((prev) => !prev);
 
   return (
     <Card title="Datos Administrativos">
@@ -210,70 +197,11 @@ const DatosAdministrativos = ({ onChange, tipoContrato = "compraventa" }) => {
         </div>
 
         {showConcuerdo && (
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
-            <h4 className="font-semibold text-blue-900">Datos del Concuerdo</h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <FormField label="N° Protocolo" required>
-                <input
-                  type="text"
-                  name="concuerdoNumeroProtocolo"
-                  value={formData.concuerdoNumeroProtocolo}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="Ej: 456"
-                />
-              </FormField>
-
-              <FormField label="Fecha" required>
-                <input
-                  type="date"
-                  name="concuerdoFecha"
-                  value={formData.concuerdoFecha}
-                  onChange={handleChange}
-                  className="input-field"
-                />
-              </FormField>
-
-              <div className="md:col-span-2"></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField label="Nombres del Solicitante" required>
-                <input
-                  type="text"
-                  name="concuerdoNombres"
-                  value={formData.concuerdoNombres}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="Nombres completos"
-                />
-              </FormField>
-
-              <FormField label="Apellidos del Solicitante" required>
-                <input
-                  type="text"
-                  name="concuerdoApellidos"
-                  value={formData.concuerdoApellidos}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="Apellidos completos"
-                />
-              </FormField>
-
-              <FormField label="Cédula" required>
-                <input
-                  type="text"
-                  name="concuerdoCedula"
-                  value={formData.concuerdoCedula}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="1234567890"
-                  maxLength="10"
-                />
-              </FormField>
-            </div>
-          </div>
+          <p className="text-sm text-gray-600">
+            Al final de la matriz se imprimen los dos concuerdos, sin
+            peticionario. Los concuerdos adicionales se generan después desde el
+            Archivo.
+          </p>
         )}
       </div>
     </Card>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   BuscadorPlantillas,
   ModalGuardarPlantilla,
+  useBorradorDeUrl,
 } from "../../components/plantillas";
 import { Button } from "../../components/shared";
 import {
@@ -14,6 +15,7 @@ import { FileText, Download } from "lucide-react";
 import { useToast } from "../../hooks/useToast";
 import { apiFetch } from "../../config/api";
 import API_CONFIG from "../../config/api";
+import { descargarRespuesta } from "../../utils/descargas";
 
 const FormularioMatrizBase = ({
   titulo,
@@ -33,15 +35,29 @@ const FormularioMatrizBase = ({
   const [loading, setLoading] = useState(false);
   const [modalPlantillaAbierto, setModalPlantillaAbierto] = useState(false);
   const [plantillaKey, setPlantillaKey] = useState(0);
+  const [borrador, setBorrador] = useState(null); // { id, codigo, nombre }
+  const [datosAdmIniciales, setDatosAdmIniciales] = useState(null);
+  const [minutaInicial, setMinutaInicial] = useState("");
   const toast = useToast();
 
-  const handleCargarPlantilla = (contenido) => {
+  const handleCargarPlantilla = (contenido, guardado = null) => {
     if (contenido[keyParte1] !== undefined) setParte1(contenido[keyParte1]);
     if (contenido[keyParte2] !== undefined) setParte2(contenido[keyParte2]);
     if (contenido.datosAbogado !== undefined)
       setDatosAbogado(contenido.datosAbogado);
+    setDatosAdmIniciales(contenido.datosAdministrativos || null);
+    setMinutaInicial(contenido.minuta || "");
+    setMinuta(contenido.minuta || "");
+    if (guardado)
+      setBorrador({
+        id: guardado.id,
+        codigo: guardado.codigo,
+        nombre: guardado.nombre,
+      });
     setPlantillaKey((k) => k + 1);
   };
+
+  useBorradorDeUrl(handleCargarPlantilla);
 
   const handleAgregarParte1 = () => setParte1([...parte1, null]);
   const handleParte1Ready = (index, data) => {
@@ -96,16 +112,6 @@ const FormularioMatrizBase = ({
       !datosAbogado?.provinciaAbogado
     )
       errors.push("Seleccione la provincia del colegio de abogados");
-    if (datosAdministrativos?.needsConcuerdo) {
-      if (!datosAdministrativos?.concuerdoNumeroProtocolo)
-        errors.push("Ingrese el número de protocolo del concuerdo");
-      if (!datosAdministrativos?.concuerdoNombres)
-        errors.push("Ingrese los nombres del solicitante del concuerdo");
-      if (!datosAdministrativos?.concuerdoApellidos)
-        errors.push("Ingrese los apellidos del solicitante del concuerdo");
-      if (!datosAdministrativos?.concuerdoCedula)
-        errors.push("Ingrese la cédula del solicitante del concuerdo");
-    }
     return errors;
   };
 
@@ -221,15 +227,7 @@ const FormularioMatrizBase = ({
         },
         matrizador: datosAdministrativos.matrizador,
         needs_concuerdo: datosAdministrativos.needsConcuerdo || false,
-        datos_concuerdo: datosAdministrativos.needsConcuerdo
-          ? {
-              numero_protocolo: datosAdministrativos.concuerdoNumeroProtocolo,
-              names: datosAdministrativos.concuerdoNombres,
-              last_names: datosAdministrativos.concuerdoApellidos,
-              document_number: datosAdministrativos.concuerdoCedula,
-              fecha: datosAdministrativos.concuerdoFecha,
-            }
-          : null,
+        datos_concuerdo: null,
         participantes_list: participantesList,
         [keyParte1 + "_list"]: parte1List,
         [keyParte2 + "_list"]: parte2List,
@@ -252,16 +250,8 @@ const FormularioMatrizBase = ({
       if (response.ok) {
         const data = await response.json();
         const downloadResponse = await apiFetch(data.download_url);
-        const blob = await downloadResponse.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `matriz_${datosAdministrativos.numeroProtocolo}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success("Matriz generada exitosamente");
+        await descargarRespuesta(downloadResponse, `${data.codigo}.docx`);
+        toast.success(`Protocolo ${data.codigo} generado`);
       } else {
         const data = await response.json();
         toast.error(data.detail || "Error al generar matriz");
@@ -279,6 +269,7 @@ const FormularioMatrizBase = ({
     if (v.esEmpresa) return v.razonSocial || "";
     return (
       [v.nombres, v.apellidos].filter(Boolean).join(" ") ||
+      [v.names, v.lastNames].filter(Boolean).join(" ") ||
       v.nombreCompleto ||
       ""
     );
@@ -295,7 +286,7 @@ const FormularioMatrizBase = ({
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p className="text-sm font-medium text-amber-800 mb-2">
-            Cargar desde plantilla
+            Cargar borrador
           </p>
           <BuscadorPlantillas
             tipoDocumento="matriz"
@@ -303,17 +294,25 @@ const FormularioMatrizBase = ({
             onCargar={handleCargarPlantilla}
           />
           <p className="text-xs text-amber-600 mt-2">
-            Busca por nombre de proyecto o {labelParte1.toLowerCase()}. Al
-            seleccionar una plantilla se cargarán todos los datos del
-            formulario.
+            Busca por código, nombre del borrador o {labelParte1.toLowerCase()}.
+            Al seleccionar un borrador se cargan todos los datos del formulario.
           </p>
+          {borrador && (
+            <p className="text-sm text-amber-900 mt-3">
+              Editando el borrador{" "}
+              <span className="font-mono font-semibold">{borrador.codigo}</span>{" "}
+              · {borrador.nombre}
+            </p>
+          )}
         </div>
       </div>
 
       <div className="space-y-6">
         <DatosAdministrativos
+          key={`adm-${plantillaKey}`}
           onChange={setDatosAdministrativos}
           tipoContrato={tipoContrato}
+          initialData={datosAdmIniciales}
         />
 
         {/* PARTE 1 */}
@@ -397,10 +396,18 @@ const FormularioMatrizBase = ({
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             Minuta del Contrato
           </h2>
-          <TextNumberTransformer onChange={setMinuta} />
+          <TextNumberTransformer
+            key={`minuta-${plantillaKey}`}
+            onChange={setMinuta}
+            initialHtml={minutaInicial}
+          />
         </div>
 
-        <DatosAbogado onChange={setDatosAbogado} initialData={datosAbogado} />
+        <DatosAbogado
+          key={`abogado-${plantillaKey}`}
+          onChange={setDatosAbogado}
+          initialData={datosAbogado}
+        />
 
         {/* BOTONES */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 shadow-lg">
@@ -409,7 +416,7 @@ const FormularioMatrizBase = ({
               onClick={() => setModalPlantillaAbierto(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
             >
-              Guardar como plantilla
+              {borrador ? "Guardar borrador" : "Guardar como borrador"}
             </button>
             <Button
               variant="primary"
@@ -434,10 +441,16 @@ const FormularioMatrizBase = ({
       <ModalGuardarPlantilla
         abierto={modalPlantillaAbierto}
         onCerrar={() => setModalPlantillaAbierto(false)}
-        onGuardado={() => {
+        onGuardado={(data) => {
           setModalPlantillaAbierto(false);
-          toast.success("Plantilla guardada correctamente");
+          setBorrador({
+            id: data.id,
+            codigo: data.codigo,
+            nombre: data.nombre,
+          });
+          toast.success(`Borrador ${data.codigo} guardado`);
         }}
+        borrador={borrador}
         tipoDocumento="matriz"
         tipoContrato={tipoContrato}
         nombreVendedor={nombrePrimero}

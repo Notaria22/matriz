@@ -4,7 +4,7 @@ import {
   FileText,
   Users,
   UserCircle,
-  History,
+  Archive,
   FileEdit,
   LogOut,
   Link2,
@@ -41,9 +41,9 @@ const Sidebar = () => {
       roles: ["admin", "lexdata"],
     },
     {
-      name: "Historial",
-      path: "/historial",
-      icon: History,
+      name: "Archivo",
+      path: "/archivo",
+      icon: Archive,
       roles: ["admin", "notaria", "lexdata"],
     },
     {

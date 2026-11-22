@@ -5,7 +5,7 @@ from app.utils.number_to_words import (
     numero_a_letras, numero_a_digitos, formatear_fecha_notarial,
     numero_casa_en_direccion, codigo_a_letras, numeros_en_texto_a_letras,
 )
-from app.utils.html_to_richtext import html_to_richtext
+from app.utils.html_to_richtext import html_a_richtext_en_linea
 import logging
 import uuid
 
@@ -15,6 +15,14 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 OUTPUTS_DIR = Path(__file__).parent.parent.parent / "generated_documents"
 
 OUTPUTS_DIR.mkdir(exist_ok=True)
+
+def nombres_portada(participantes):
+    """Carátula: uno o dos comparecientes con su nombre; más de dos, el primero "Y OTROS"."""
+    nombres = [p['razonSocial'] if p.get('esEmpresa') else p['nombreCompleto'].upper() for p in participantes]
+    if len(nombres) > 2:
+        return f"{nombres[0]} Y OTROS"
+    return " Y ".join(nombres)
+
 
 def calcular_edad(fecha_nacimiento_str):
     """Calcula la edad en años a partir de fecha de nacimiento"""
@@ -293,6 +301,10 @@ def generate_matriz_compraventa(data: dict, template_name: str = "compraventa.do
         'compradores': compradores_procesados,
         'todosParticipantes': todos_participantes,
         
+        # Carátula
+        'portadaParte1': nombres_portada(vendedores_procesados),
+        'portadaParte2': nombres_portada(compradores_procesados),
+
         # Conteos
         'numVendedores': len(vendedores_procesados),
         'numCompradores': len(compradores_procesados),
@@ -322,7 +334,7 @@ def generate_matriz_compraventa(data: dict, template_name: str = "compraventa.do
     }
     
     if 'abogadoTexto' in data and data['abogadoTexto']:
-        context['abogadoTexto'] = html_to_richtext(data['abogadoTexto'])
+        context['abogadoTexto'] = html_a_richtext_en_linea(data['abogadoTexto'])
     else:
         context['abogadoTexto'] = ''
         

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from datetime import date
 import os
 import logging
 
@@ -12,9 +13,39 @@ from app.models.minute import Minute, MinuteType
 from app.services.minuta_generator import generate_minuta_compraventa
 from app.services.promesa_minuta_generator import generate_promesa_minuta_compraventa
 from app.services.poder_generator import generate_poder
+from app.services.archivo import siguiente_codigo, texto_de_busqueda, filtrar_busqueda
 
 router = APIRouter(prefix="/minutes", tags=["minutes"])
 logger = logging.getLogger(__name__)
+
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def verificar_acceso_minutas(current_user: SystemUser):
+    if current_user.rol.value == "notaria":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes acceso a minutas"
+        )
+
+
+def registrar_minuta(db: Session, tipo: MinuteType, data: dict, output_path: str, current_user: SystemUser) -> Minute:
+    nueva = Minute(
+        codigo=siguiente_codigo(db, "minuta"),
+        minute_type=tipo,
+        contract_data=data,
+        texto_busqueda=texto_de_busqueda(data),
+        file_path=output_path,
+        created_by=current_user.id
+    )
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return nueva
+
+
+def descarga(minute: Minute) -> FileResponse:
+    return FileResponse(path=minute.file_path, filename=f"{minute.codigo}.docx", media_type=DOCX)
 
 
 @router.post("/generate-minuta")
@@ -39,21 +70,8 @@ async def generate_minuta(
                 detail="Error al generar el documento"
             )
 
-        new_minute = Minute(
-            minute_type=MinuteType.COMPRAVENTA_INMUEBLE,
-            contract_data=data,
-            file_path=output_path,
-            created_by=current_user.id
-        )
-        db.add(new_minute)
-        db.commit()
-        db.refresh(new_minute)
-
-        return FileResponse(
-            path=output_path,
-            filename=f"minuta_{new_minute.id}.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        new_minute = registrar_minuta(db, MinuteType.COMPRAVENTA_INMUEBLE, data, output_path, current_user)
+        return descarga(new_minute)
 
     except HTTPException:
         raise
@@ -68,12 +86,31 @@ async def generate_minuta(
 @router.get("")
 @router.get("/", include_in_schema=False)
 async def list_minutes(
+    q: Optional[str] = Query(None, description="Código, nombres o cédulas"),
+    tipo: Optional[str] = Query(None),
+    desde: Optional[date] = Query(None),
+    hasta: Optional[date] = Query(None),
+    limite: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: SystemUser = Depends(get_current_user)
 ):
-    """Listar todas las minutas del usuario actual"""
-    minutes = db.query(Minute).filter(Minute.created_by == current_user.id).all()
-    return minutes
+    """Minutas generadas por el usuario actual, para el Archivo (sin el contenido completo)"""
+    verificar_acceso_minutas(current_user)
+    query = db.query(Minute).filter(Minute.created_by == current_user.id)
+    if tipo:
+        query = query.filter(Minute.minute_type == MinuteType(tipo))
+    query = filtrar_busqueda(query, [Minute.codigo, Minute.texto_busqueda], q, Minute.created_at, desde, hasta)
+    minutas = query.order_by(Minute.created_at.desc(), Minute.id.desc()).limit(limite).all()
+    return [
+        {
+            "id": m.id,
+            "codigo": m.codigo,
+            "tipo": m.minute_type.value,
+            "comparecientes": m.texto_busqueda or "",
+            "created_at": m.created_at,
+        }
+        for m in minutas
+    ]
 
 
 @router.get("/{minute_id}")
@@ -121,11 +158,7 @@ async def download_minute(
             detail="Archivo no encontrado"
         )
 
-    return FileResponse(
-        path=minute.file_path,
-        filename=f"minuta_{minute.id}.docx",
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    return descarga(minute)
 
 
 @router.post("/generate-promesa")
@@ -145,21 +178,8 @@ async def generate_promesa(
             )
 
         # Bug corregido: usar MinuteType.PROMESA_COMPRAVENTA en lugar de COMPRAVENTA_INMUEBLE
-        new_minute = Minute(
-            minute_type=MinuteType.PROMESA_COMPRAVENTA,
-            contract_data=data,
-            file_path=output_path,
-            created_by=current_user.id
-        )
-        db.add(new_minute)
-        db.commit()
-        db.refresh(new_minute)
-
-        return FileResponse(
-            path=output_path,
-            filename=f"promesa_compraventa_{new_minute.id}.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        new_minute = registrar_minuta(db, MinuteType.PROMESA_COMPRAVENTA, data, output_path, current_user)
+        return descarga(new_minute)
 
     except HTTPException:
         raise
@@ -186,21 +206,8 @@ async def generate_poder_endpoint(
                 detail="Error al generar el documento"
             )
 
-        new_minute = Minute(
-            minute_type=MinuteType.PODERES,
-            contract_data=data,
-            file_path=output_path,
-            created_by=current_user.id
-        )
-        db.add(new_minute)
-        db.commit()
-        db.refresh(new_minute)
-
-        return FileResponse(
-            path=output_path,
-            filename=f"poder_{new_minute.id}.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        new_minute = registrar_minuta(db, MinuteType.PODERES, data, output_path, current_user)
+        return descarga(new_minute)
 
     except HTTPException:
         raise

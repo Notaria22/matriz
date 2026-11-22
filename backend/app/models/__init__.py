@@ -13,6 +13,7 @@ from app.models.document import Document
 from app.models.minute import Minute, MinuteType
 from app.models.template import Template
 from app.models.access_log import AccessLog
+from app.models.contador_mensual import ContadorMensual
 
 __all__ = [
     "SystemUser",
@@ -29,4 +30,5 @@ __all__ = [
     "MinuteType",
     "Template",
     "AccessLog",
+    "ContadorMensual",
 ]

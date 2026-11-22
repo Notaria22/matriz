@@ -1,4 +1,5 @@
 from docxtpl import RichText
+import re
 from bs4 import BeautifulSoup
 
 def html_to_richtext(html_content):
@@ -73,3 +74,54 @@ def process_element(element, rt, bold=False, italic=False, underline=False):
             else:
                 # Procesar cualquier otro elemento recursivamente
                 process_element(child, rt, is_bold, is_italic, is_underline)
+
+BLOQUES = {'p', 'div', 'br', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'table'}
+
+
+def html_a_richtext_en_linea(html_content):
+    """
+    Igual que html_to_richtext, pero todo de corrido: los párrafos, saltos y
+    viñetas se vuelven un espacio. Conserva negritas, cursivas y subrayados.
+    """
+    rt = RichText()
+    if not html_content or not html_content.strip():
+        return rt
+
+    trozos = []  # (texto, negrita, cursiva, subrayado)
+
+    def recorrer(elemento, bold=False, italic=False, underline=False):
+        for hijo in elemento.children:
+            if isinstance(hijo, str):
+                trozos.append((str(hijo), bold, italic, underline))
+                continue
+            nombre = (hijo.name or '').lower()
+            if nombre in BLOQUES:
+                trozos.append((' ', False, False, False))
+            recorrer(
+                hijo,
+                bold or nombre in ('b', 'strong'),
+                italic or nombre in ('i', 'em'),
+                underline or nombre == 'u',
+            )
+            if nombre in BLOQUES:
+                trozos.append((' ', False, False, False))
+
+    recorrer(BeautifulSoup(html_content, 'html.parser'))
+
+    anterior_espacio = True  # evita espacios al inicio
+    pendientes = []
+    for texto, b, i, u in trozos:
+        texto = re.sub(r'\s+', ' ', texto.replace(' ', ' '))
+        if anterior_espacio:
+            texto = texto.lstrip(' ')
+        if not texto:
+            continue
+        anterior_espacio = texto.endswith(' ')
+        pendientes.append([texto, b, i, u])
+
+    if pendientes:
+        pendientes[-1][0] = pendientes[-1][0].rstrip(' ')
+    for texto, b, i, u in pendientes:
+        if texto:
+            rt.add(texto, bold=b, italic=i, underline=u)
+    return rt

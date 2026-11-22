@@ -10,6 +10,7 @@ import { FileText, ArrowLeft } from "lucide-react";
 import { useToast } from "../../../hooks/useToast";
 import { apiFetch } from "../../../config/api";
 import API_CONFIG from "../../../config/api";
+import { descargarRespuesta } from "../../../utils/descargas";
 import { TIPOS_PODER } from "./SeleccionTipoPoderPage";
 
 const TIPOS_COMPARECENCIA = [
@@ -320,15 +321,7 @@ const FormularioPoder = () => {
       });
 
       if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `poder_${Date.now()}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        await descargarRespuesta(response, "poder.docx");
         toast.success("Poder generado exitosamente");
       } else {
         const data = await response.json();

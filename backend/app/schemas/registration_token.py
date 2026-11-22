@@ -9,9 +9,13 @@ class GenerarTokenRequest(BaseModel):
     """El link se genera para un documento: el formulario solo aceptará ese."""
     tipo: str = Field(..., pattern="^(persona|empresa)$")
     documento: str = Field(..., min_length=6, max_length=20)
+    nombre: str = Field(..., max_length=200)
 
     @model_validator(mode="after")
     def validar_documento(self):
+        self.nombre = " ".join(self.nombre.split()).upper()
+        if len(self.nombre) < 3:
+            raise ValueError("Ingrese el nombre del compareciente")
         doc = self.documento.strip().upper()
         if self.tipo == "empresa":
             if not (doc.isdigit() and len(doc) == 13 and doc.endswith("001")):
@@ -33,6 +37,7 @@ class TokenGenerado(BaseModel):
     creado_por: str
     tipo: str
     documento: str
+    nombre: Optional[str] = None
 
 
 class TokenInfo(BaseModel):
@@ -53,6 +58,7 @@ class RegistrationTokenResponse(BaseModel):
     usado_en: Optional[datetime]
     tipo_esperado: str
     documento_esperado: str
+    nombre_compareciente: Optional[str] = None
     creado_en: datetime
     expira_en: datetime
     creado_por: Optional[str]  # username del empleado

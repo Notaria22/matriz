@@ -11,8 +11,15 @@ class TemplateCreate(BaseModel):
     contenido: Dict[str, Any]
 
 
+class TemplateUpdate(BaseModel):
+    nombre: str
+    nombre_vendedor: str
+    contenido: Dict[str, Any]
+
+
 class TemplateResponse(BaseModel):
     id: int
+    codigo: str
     nombre: str
     nombre_vendedor: str
     tipo_contrato: str
@@ -20,6 +27,7 @@ class TemplateResponse(BaseModel):
     contenido: Dict[str, Any]
     creado_por: int
     creado_at: datetime
+    actualizado_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -28,11 +36,13 @@ class TemplateResponse(BaseModel):
 class TemplateSearchResult(BaseModel):
     """Respuesta simplificada para el buscador — sin contenido completo"""
     id: int
+    codigo: str
     nombre: str
     nombre_vendedor: str
     tipo_contrato: str
     tipo_documento: str
     creado_at: datetime
+    actualizado_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

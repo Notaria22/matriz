@@ -7,7 +7,7 @@ import { apiFetch } from "../../config/api";
  * Props:
  *   tipoDocumento  — 'minuta' | 'matriz'
  *   tipoContrato   — 'compraventa' | 'promesa' | 'poder'
- *   onCargar       — callback que recibe el contenido completo de la plantilla seleccionada
+ *   onCargar       — callback (contenido, borrador) del borrador seleccionado
  */
 const BuscadorPlantillas = ({ tipoDocumento, tipoContrato, onCargar }) => {
   const [query, setQuery] = useState("");
@@ -44,7 +44,7 @@ const BuscadorPlantillas = ({ tipoDocumento, tipoContrato, onCargar }) => {
           setAbierto(true);
         }
       } catch (error) {
-        console.error("Error buscando plantillas:", error);
+        console.error("Error buscando borradores:", error);
       } finally {
         setBuscando(false);
       }
@@ -77,10 +77,10 @@ const BuscadorPlantillas = ({ tipoDocumento, tipoContrato, onCargar }) => {
       const response = await apiFetch(`/api/templates/${plantilla.id}`);
       if (response.ok) {
         const data = await response.json();
-        onCargar(data.contenido);
+        onCargar(data.contenido, data);
       }
     } catch (error) {
-      console.error("Error cargando plantilla:", error);
+      console.error("Error cargando borrador:", error);
     } finally {
       setCargando(false);
     }
@@ -110,7 +110,7 @@ const BuscadorPlantillas = ({ tipoDocumento, tipoContrato, onCargar }) => {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar plantilla por nombre o vendedor..."
+          placeholder="Buscar borrador por código, nombre, vendedor o cédula..."
           className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm
                      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
@@ -134,7 +134,7 @@ const BuscadorPlantillas = ({ tipoDocumento, tipoContrato, onCargar }) => {
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
           {resultados.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-500 text-center">
-              No se encontraron plantillas
+              No se encontraron borradores
             </div>
           ) : (
             <ul>
@@ -148,7 +148,10 @@ const BuscadorPlantillas = ({ tipoDocumento, tipoContrato, onCargar }) => {
                       <FileText className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {plantilla.nombre}
+                          <span className="font-mono text-primary-700">
+                            {plantilla.codigo}
+                          </span>{" "}
+                          · {plantilla.nombre}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {plantilla.nombre_vendedor} ·{" "}

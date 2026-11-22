@@ -24,6 +24,8 @@ class RegistrationToken(Base):
 
     tipo_esperado = Column(enum_column_type(TipoSujeto, "tipo_esperado"), nullable=False)
     documento_esperado = Column(String(20), nullable=False)
+    # Para que el personal sepa a quién envió cada link
+    nombre_compareciente = Column(String(200), nullable=True)
 
     usado = Column(Boolean, default=False, server_default="0", nullable=False)
     usado_en = Column(DateTime(timezone=True), nullable=True)

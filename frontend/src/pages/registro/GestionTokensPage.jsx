@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { apiFetch } from "../../config/api";
+import API_CONFIG, { apiFetch } from "../../config/api";
 import { Card, Button } from "../../components/shared";
 import { useToast } from "../../hooks/useToast";
 
@@ -13,6 +13,8 @@ const GestionTokensPage = () => {
   const [tipo, setTipo] = useState("persona");
   const [documento, setDocumento] = useState("");
   const [errorDocumento, setErrorDocumento] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [errorNombre, setErrorNombre] = useState("");
 
   const validarDocumento = () => {
     const doc = documento.trim().toUpperCase();
@@ -44,10 +46,38 @@ const GestionTokensPage = () => {
     cargarTokens();
   }, [cargarTokens]);
 
+  // Si el documento ya está registrado, se trae el nombre
+  const buscarNombre = async () => {
+    if (nombre.trim() || validarDocumento()) return;
+    const doc = documento.trim().toUpperCase();
+    const base =
+      tipo === "empresa"
+        ? API_CONFIG.ENDPOINTS.COMPANIES
+        : API_CONFIG.ENDPOINTS.PARTIES;
+    try {
+      const res = await apiFetch(`${base}/${encodeURIComponent(doc)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const encontrado =
+        tipo === "empresa"
+          ? data.razon_social
+          : [data.names, data.last_names].filter(Boolean).join(" ");
+      if (encontrado) {
+        setNombre((actual) => actual || encontrado.toUpperCase());
+        setErrorNombre("");
+      }
+    } catch {
+      // si no se encuentra, se escribe a mano
+    }
+  };
+
   const generarToken = async () => {
     const error = validarDocumento();
+    const faltaNombre =
+      nombre.trim().length < 3 ? "Ingrese el nombre del compareciente" : "";
     setErrorDocumento(error);
-    if (error) return;
+    setErrorNombre(faltaNombre);
+    if (error || faltaNombre) return;
 
     setGenerando(true);
     setLinkGenerado(null);
@@ -57,12 +87,14 @@ const GestionTokensPage = () => {
         body: JSON.stringify({
           tipo,
           documento: documento.trim().toUpperCase(),
+          nombre: nombre.trim(),
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        setLinkGenerado(data.link);
+        setLinkGenerado({ link: data.link, nombre: data.nombre });
         setDocumento("");
+        setNombre("");
         toastRef.current.success("Enlace generado correctamente");
         cargarTokens();
       } else {
@@ -160,6 +192,8 @@ const GestionTokensPage = () => {
                 onChange={(e) => {
                   setTipo(e.target.value);
                   setErrorDocumento("");
+                  setNombre("");
+                  setErrorNombre("");
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
@@ -180,6 +214,7 @@ const GestionTokensPage = () => {
                   setDocumento(e.target.value);
                   setErrorDocumento("");
                 }}
+                onBlur={buscarNombre}
                 maxLength={13}
                 placeholder={
                   tipo === "empresa" ? "1790012345001" : "1712345678"
@@ -192,6 +227,37 @@ const GestionTokensPage = () => {
               />
               {errorDocumento && (
                 <p className="text-red-500 text-xs mt-1">{errorDocumento}</p>
+              )}
+            </div>
+            <div className="sm:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {tipo === "empresa"
+                  ? "Razón social de la empresa"
+                  : "Nombre del compareciente"}
+              </label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => {
+                  setNombre(e.target.value);
+                  setErrorNombre("");
+                }}
+                maxLength={200}
+                placeholder={
+                  tipo === "empresa"
+                    ? "CONSTRUCTORA ANDES S.A."
+                    : "NOMBRES Y APELLIDOS"
+                }
+                className={`w-full px-3 py-2 border rounded-lg text-sm uppercase ${
+                  errorNombre ? "border-red-400 bg-red-50" : "border-gray-300"
+                }`}
+              />
+              {errorNombre ? (
+                <p className="text-red-500 text-xs mt-1">{errorNombre}</p>
+              ) : (
+                <p className="text-gray-500 text-xs mt-1">
+                  Si el documento ya está registrado, el nombre se llena solo.
+                </p>
               )}
             </div>
           </div>
@@ -208,18 +274,19 @@ const GestionTokensPage = () => {
           {linkGenerado && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm font-medium text-green-800 mb-2">
-                ✅ Enlace generado — compártelo con el cliente por WhatsApp o
-                email:
+                ✅ Enlace generado para{" "}
+                <span className="font-semibold">{linkGenerado.nombre}</span> —
+                compártelo con el cliente por WhatsApp o email:
               </p>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   readOnly
-                  value={linkGenerado}
+                  value={linkGenerado.link}
                   className="flex-1 px-3 py-2 bg-white border border-green-300 rounded-lg text-sm text-gray-700 focus:outline-none"
                 />
                 <Button
-                  onClick={() => copiarLink(linkGenerado)}
+                  onClick={() => copiarLink(linkGenerado.link)}
                   variant="outline"
                   size="sm"
                 >
@@ -228,7 +295,7 @@ const GestionTokensPage = () => {
               </div>
               <div className="mt-3">
                 <a
-                  href={`https://wa.me/?text=${encodeURIComponent(`Estimado cliente, por favor complete sus datos antes de su cita en la notaría usando el siguiente enlace: ${linkGenerado}`)}`}
+                  href={`https://wa.me/?text=${encodeURIComponent(`Estimado/a ${linkGenerado.nombre || "cliente"}, por favor complete sus datos antes de su cita en la notaría usando el siguiente enlace: ${linkGenerado.link}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
@@ -287,6 +354,11 @@ const GestionTokensPage = () => {
                         {formatearFecha(tkn.expira_en)}
                       </td>
                       <td className="py-3 pr-4 text-gray-700">
+                        {tkn.nombre_compareciente && (
+                          <div className="font-medium text-gray-900">
+                            {tkn.nombre_compareciente}
+                          </div>
+                        )}
                         <span className="text-xs text-gray-500 mr-1">
                           {tkn.tipo_esperado === "empresa" ? "RUC" : "Doc."}
                         </span>

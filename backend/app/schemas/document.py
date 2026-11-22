@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 
 class LawyerData(BaseModel):
@@ -19,11 +20,12 @@ class NotarioData(BaseModel):
 
 
 class ConcuerdoData(BaseModel):
-    numero_protocolo: str
-    names: str
-    last_names: str
-    document_number: str
-    fecha: str
+    # Los dos concuerdos que salen con la matriz no tienen peticionario
+    numero_protocolo: Optional[str] = None
+    names: Optional[str] = None
+    last_names: Optional[str] = None
+    document_number: Optional[str] = None
+    fecha: Optional[str] = None
 
 
 class ParticipantePersona(BaseModel):
@@ -135,4 +137,19 @@ class GenerateMatrizResponse(BaseModel):
     message: str
     document_id: int
     protocol_number: str
+    codigo: str
     download_url: str
+
+
+class ProtocoloResultado(BaseModel):
+    """Fila del Archivo: protocolo generado, sin el contenido completo."""
+    id: int
+    codigo: str
+    protocol_number: str
+    document_type: str
+    amount: Optional[float] = None
+    parties_data: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

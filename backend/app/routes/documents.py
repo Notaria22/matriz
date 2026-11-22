@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.system_user import SystemUser
 from app.models.document import Document
-from app.schemas.document import GenerateMatrizRequest, GenerateMatrizResponse
+from app.schemas.document import GenerateMatrizRequest, GenerateMatrizResponse, ProtocoloResultado
 from app.middleware.auth import get_current_user
 from app.services.document_generator import generate_matriz_compraventa
+from app.services.archivo import codigo_protocolo, texto_de_busqueda, filtrar_busqueda
 import os
 import logging
 
@@ -40,7 +44,6 @@ TIPO_CONTRATO_CONFIG = {
     },
 }
 
-# Cómo se escribe el tipo de contrato dentro de la escritura
 NOMBRE_CONTRATO = {
     "compraventa": "COMPRAVENTA",
     "promesa_compraventa": "PROMESA DE COMPRAVENTA",
@@ -68,7 +71,6 @@ def generate_matriz(
                 detail=f"Tipo de contrato '{tipo}' no válido. Valores permitidos: {', '.join(TIPOS_VALIDOS)}"
             )
 
-        # El notario suplente firma con su número de acción de personal
         accion_personal = (request.notario.accion_personal or "").strip() or None
         if "suplente" in (request.notario.titulo or "").lower() and not accion_personal:
             raise HTTPException(
@@ -78,7 +80,6 @@ def generate_matriz(
 
         config = TIPO_CONTRATO_CONFIG.get(tipo)
 
-        # Obtener las listas de partes según el tipo de contrato
         partes_map = {
             "compraventa": (request.vendedores_list, request.compradores_list),
             "promesa_compraventa": (request.promitentes_vendedores_list, request.promitentes_compradores_list),
@@ -94,7 +95,6 @@ def generate_matriz(
             "fechaActual": request.fecha_escritura,
             "notario": request.notario.nombre,
             "tituloNotario": request.notario.titulo,
-            # Solo cuando la matriz sale a nombre del notario suplente
             "accionPersonal": accion_personal,
             "matrizador": request.matrizador,
             "isAnyTerceraEdad": request.is_any_tercera_edad,
@@ -107,11 +107,8 @@ def generate_matriz(
             "abogadoEsMujer": request.abogado.genero_abogado.lower() == "femenino",
             "abogadoTexto": request.abogado.minuta_texto,
             "participantesList": request.participantes_list,
-            # Siempre enviamos como vendedores/compradores al generador
-            # pero con los labels correctos según el tipo
             "vendedoresList": parte1_list,
             "compradoresList": parte2_list,
-            # Labels para las partes en el documento
             "labelParte1": config["label_parte1"],
             "labelParte2": config["label_parte2"],
         }
@@ -130,9 +127,17 @@ def generate_matriz(
                 return p.get('ruc', '')
             return p.get('cedula', '')
 
+        def nombre(p):
+            if p.get('esEmpresa'):
+                return p.get('razonSocial', '')
+            return f"{p.get('nombres', '')} {p.get('apellidos', '')}".strip()
+
+        contenido = request.model_dump(mode="json")
+
         document = Document(
             document_type=tipo,
             protocol_number=request.numero_protocolo,
+            codigo=codigo_protocolo(request.numero_protocolo),
             amount=request.cuantia,
             generated_by=current_user.id,
             notario=request.notario.nombre,
@@ -141,8 +146,12 @@ def generate_matriz(
             parties_data={
                 "parte1": [identificador(v) for v in parte1_list],
                 "parte2": [identificador(c) for c in parte2_list],
+                "nombres1": [nombre(v) for v in parte1_list],
+                "nombres2": [nombre(c) for c in parte2_list],
             },
-            file_path=file_path
+            file_path=file_path,
+            contenido=contenido,
+            texto_busqueda=texto_de_busqueda(contenido),
         )
 
         db.add(document)
@@ -153,6 +162,7 @@ def generate_matriz(
             "message": "Documento generado exitosamente",
             "document_id": document.id,
             "protocol_number": request.numero_protocolo,
+            "codigo": document.codigo,
             "download_url": f"/api/documents/download/{document.id}"
         }
 
@@ -164,6 +174,28 @@ def generate_matriz(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno al generar el documento. Contacte al administrador."
         )
+
+@router.get("", response_model=List[ProtocoloResultado])
+def listar_protocolos(
+    q: Optional[str] = Query(None, description="Código, número de protocolo, nombres o cédulas"),
+    tipo: Optional[str] = Query(None),
+    desde: Optional[date] = Query(None),
+    hasta: Optional[date] = Query(None),
+    limite: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: SystemUser = Depends(get_current_user)
+):
+    """Protocolos generados por el usuario actual, para el Archivo."""
+    query = db.query(Document).filter(Document.generated_by == current_user.id)
+    if tipo:
+        query = query.filter(Document.document_type == tipo)
+    query = filtrar_busqueda(
+        query,
+        [Document.codigo, Document.protocol_number, Document.texto_busqueda],
+        q, Document.created_at, desde, hasta,
+    )
+    return query.order_by(Document.created_at.desc(), Document.id.desc()).limit(limite).all()
+
 
 @router.get("/download/{document_id}")
 def download_document(
@@ -189,7 +221,7 @@ def download_document(
             detail="Archivo no encontrado en el servidor"
         )
 
-    filename = f"matriz_{document.protocol_number}.docx"
+    filename = f"{document.codigo}.docx"
 
     return FileResponse(
         document.file_path,

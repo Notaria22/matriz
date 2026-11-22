@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { limpiarPegado } from "../../utils/limpiarPegado";
 
 // El elemento guardado en estado es un nodo del DOM del editor: se modifica
 // directamente (no es estado de React), por eso va en funciones aparte.
@@ -14,7 +15,7 @@ const restaurarOriginal = (el) => {
   delete el.dataset.transformedFrom;
 };
 
-const TextNumberTransformer = ({ onChange }) => {
+const TextNumberTransformer = ({ onChange, initialHtml = "" }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeElement, setActiveElement] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -900,6 +901,25 @@ const TextNumberTransformer = ({ onChange }) => {
     }
   };
 
+  // Texto de un borrador: se carga una sola vez al montar
+  useEffect(() => {
+    if (initialHtml && editorRef.current) {
+      editorRef.current.innerHTML = initialHtml;
+      handleContentChange();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const html = limpiarPegado(
+      e.clipboardData.getData("text/html"),
+      e.clipboardData.getData("text/plain"),
+    );
+    if (html) document.execCommand("insertHTML", false, html);
+    handleContentChange();
+  };
+
   // Sincronizar contenido cuando cambia el editor
   useEffect(() => {
     if (editorRef.current) {
@@ -993,7 +1013,8 @@ const TextNumberTransformer = ({ onChange }) => {
           <div
             ref={editorRef}
             contentEditable
-            className="w-full min-h-64 p-4 border-2 border-gray-300 border-t-0 rounded-b-lg focus:border-blue-500 focus:outline-none"
+            onPaste={handlePaste}
+            className="w-full min-h-64 p-4 border-2 border-gray-300 border-t-0 rounded-b-lg focus:border-blue-500 focus:outline-none [&_p]:mb-2"
             style={{ whiteSpace: "pre-wrap" }}
             suppressContentEditableWarning={true}
             data-placeholder="Escriba o pegue aquí el texto de la minuta. Ejemplo: av. 12 de octubre n24-660, +2.60, 18,82%, 20m, ing. Juan"
