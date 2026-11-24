@@ -33,6 +33,10 @@ export const transformToCamelCase = (data) => {
     return {
       esEmpresa: true,
       ruc: data.ruc || "",
+      esExtranjera: data.es_extranjera === true,
+      paisDomicilio: data.pais_domicilio || "",
+      ciudadDomicilio: data.ciudad_domicilio || "",
+      direccionExtranjero: data.direccion_extranjero || "",
       razonSocial: data.razon_social || "",
       email: data.email || "",
       phone: data.phone || "",
