@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -24,6 +25,7 @@ from app.schemas.company import CompanyCreate
 from app.schemas.party import PartyCreate
 from app.schemas.registration_token import (
     GenerarTokenRequest,
+    PaginaTokens,
     RegistrationTokenResponse,
     TokenGenerado,
     TokenInfo,
@@ -35,6 +37,8 @@ from app.utils.anexos import guardar_anexo_pdf
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["registro"])
+
+DIAS_VIGENCIA_LINK = 7
 
 MENSAJE_LINK_INVALIDO = "El enlace no es válido o ya fue utilizado"
 
@@ -51,7 +55,8 @@ def generar_token(
 ):
     """Genera un link para un documento concreto (cédula/pasaporte o RUC del titular)."""
     token_str = str(uuid.uuid4())
-    expira_en = datetime.now(timezone.utc) + timedelta(hours=72)
+    ahora = datetime.now(timezone.utc)
+    expira_en = ahora + timedelta(days=DIAS_VIGENCIA_LINK)
     link = f"{settings.FRONTEND_URL.rstrip('/')}/registro/{_slug(datos.nombre)}-{token_str}"
 
     token = RegistrationToken(
@@ -61,6 +66,7 @@ def generar_token(
         documento_esperado=datos.documento,
         nombre_compareciente=datos.nombre,
         expira_en=expira_en,
+        creado_en=ahora,
         creado_por=current_user.id,
     )
     db.add(token)
@@ -77,18 +83,48 @@ def generar_token(
     )
 
 
-@router.get("/api/registro/tokens", response_model=list[RegistrationTokenResponse])
+@router.get("/api/registro/tokens", response_model=PaginaTokens)
 def listar_tokens(
+    estado: str = Query("pendiente", pattern="^(pendiente|usado|expirado|todos)$"),
+    q: Optional[str] = Query(None, max_length=200, description="Cédula, RUC o nombre"),
+    pagina: int = Query(1, ge=1),
+    por_pagina: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: SystemUser = Depends(get_current_user),
 ):
+    # Las fechas se guardan en UTC sin zona
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+    condiciones = {
+        "pendiente": and_(RegistrationToken.usado.is_(False), RegistrationToken.expira_en >= ahora),
+        "usado": RegistrationToken.usado.is_(True),
+        "expirado": and_(RegistrationToken.usado.is_(False), RegistrationToken.expira_en < ahora),
+    }
+
+    base = db.query(RegistrationToken)
+    if q and q.strip():
+        termino = f"%{q.strip()}%"
+        base = base.filter(
+            RegistrationToken.documento_esperado.ilike(termino)
+            | RegistrationToken.nombre_compareciente.ilike(termino)
+        )
+
+    conteos = {e: base.filter(c).count() for e, c in condiciones.items()}
+    conteos["todos"] = sum(conteos.values())
+
+    consulta = base if estado == "todos" else base.filter(condiciones[estado])
+    total = conteos[estado]
+    paginas = max(1, -(-total // por_pagina))
+    pagina = min(pagina, paginas)
+
     filas = (
-        db.query(RegistrationToken, SystemUser.username)
+        consulta.add_columns(SystemUser.username)
         .outerjoin(SystemUser, SystemUser.id == RegistrationToken.creado_por)
-        .order_by(RegistrationToken.creado_en.desc())
+        .order_by(RegistrationToken.creado_en.desc(), RegistrationToken.id.desc())
+        .offset((pagina - 1) * por_pagina)
+        .limit(por_pagina)
         .all()
     )
-    return [
+    items = [
         RegistrationTokenResponse(
             id=t.id,
             token=t.token,
@@ -104,6 +140,7 @@ def listar_tokens(
         )
         for t, username in filas
     ]
+    return PaginaTokens(items=items, total=total, pagina=pagina, paginas=paginas, conteos=conteos)
 
 
 @router.delete("/api/registro/tokens/{token}", status_code=status.HTTP_204_NO_CONTENT)

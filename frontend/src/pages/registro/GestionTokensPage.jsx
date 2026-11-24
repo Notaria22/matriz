@@ -3,10 +3,29 @@ import API_CONFIG, { apiFetch } from "../../config/api";
 import { Card, Button } from "../../components/shared";
 import { useToast } from "../../hooks/useToast";
 
+const DIAS_VIGENCIA = 7;
+const POR_PAGINA = 20;
+const PESTANAS = [
+  { valor: "pendiente", etiqueta: "Pendientes" },
+  { valor: "usado", etiqueta: "Usados" },
+  { valor: "expirado", etiqueta: "Expirados" },
+  { valor: "todos", etiqueta: "Todos" },
+];
+
 const GestionTokensPage = () => {
   const toast = useToast();
   const toastRef = useRef(toast);
-  const [tokens, setTokens] = useState([]);
+  const [datos, setDatos] = useState({
+    items: [],
+    total: 0,
+    pagina: 1,
+    paginas: 1,
+    conteos: { pendiente: 0, usado: 0, expirado: 0, todos: 0 },
+  });
+  const [estado, setEstado] = useState("pendiente");
+  const [busqueda, setBusqueda] = useState("");
+  const [pagina, setPagina] = useState(1);
+  const [ahora, setAhora] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [generando, setGenerando] = useState(false);
   const [linkGenerado, setLinkGenerado] = useState(null);
@@ -30,21 +49,47 @@ const GestionTokensPage = () => {
   const cargarTokens = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/registro/tokens");
+      const params = new URLSearchParams({
+        estado,
+        pagina: String(pagina),
+        por_pagina: String(POR_PAGINA),
+      });
+      if (busqueda.trim()) params.set("q", busqueda.trim());
+      const res = await apiFetch(`/api/registro/tokens?${params}`);
       if (res.ok) {
-        const data = await res.json();
-        setTokens(data);
+        setDatos(await res.json());
+        setAhora(Date.now());
       }
     } catch {
       toastRef.current.error("Error al cargar los tokens");
     } finally {
       setLoading(false);
     }
+  }, [estado, pagina, busqueda]);
+
+  // Espera a que termine de escribir antes de buscar
+  useEffect(() => {
+    const t = setTimeout(cargarTokens, busqueda ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [cargarTokens, busqueda]);
+
+  // El tiempo restante se actualiza cada minuto
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 60000);
+    return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    cargarTokens();
-  }, [cargarTokens]);
+  const cambiarBusqueda = (valor) => {
+    setBusqueda(valor);
+    setPagina(1);
+    // La búsqueda mira todos los estados; las pestañas sirven para acotar
+    setEstado(valor.trim() ? "todos" : "pendiente");
+  };
+
+  const cambiarEstado = (valor) => {
+    setEstado(valor);
+    setPagina(1);
+  };
 
   // Si el documento ya está registrado, se trae el nombre
   const buscarNombre = async () => {
@@ -149,7 +194,31 @@ const GestionTokensPage = () => {
 
   const estaExpirado = (fechaStr) => {
     if (!fechaStr) return false;
-    return new Date(fechaStr) < new Date();
+    return new Date(fechaStr).getTime() < ahora;
+  };
+
+  const tiempoRestante = (tkn) => {
+    if (tkn.usado) return { texto: "Usado", clase: "text-gray-500" };
+    const minutos = Math.floor(
+      (new Date(tkn.expira_en).getTime() - ahora) / 60000,
+    );
+    if (minutos < 0)
+      return { texto: "Vencido", clase: "text-red-600 font-medium" };
+    if (minutos < 1)
+      return { texto: "menos de 1 min", clase: "text-red-600 font-medium" };
+    const dias = Math.floor(minutos / 1440);
+    const horas = Math.floor((minutos % 1440) / 60);
+    const mins = minutos % 60;
+    const texto =
+      dias > 0
+        ? `${dias} ${dias === 1 ? "día" : "días"} ${horas} h`
+        : horas > 0
+          ? `${horas} h ${mins} min`
+          : `${mins} min`;
+    return {
+      texto,
+      clase: minutos < 1440 ? "text-amber-600 font-medium" : "text-gray-700",
+    };
   };
 
   const getEstado = (tkn) => {
@@ -177,7 +246,7 @@ const GestionTokensPage = () => {
           <p className="text-sm text-gray-600">
             Al generar un enlace, el cliente podrá registrar sus datos
             personales sin necesidad de iniciar sesión. El enlace es válido por{" "}
-            <strong>72 horas</strong> y solo puede usarse{" "}
+            <strong>{DIAS_VIGENCIA} días</strong> y solo puede usarse{" "}
             <strong>una vez</strong>. Solo sirve para el documento que indique
             aquí: el cliente no podrá registrar otra cédula o RUC.
           </p>
@@ -309,90 +378,162 @@ const GestionTokensPage = () => {
       </Card>
 
       <Card title="Historial de enlaces">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        <div className="space-y-4">
+          <div className="relative max-w-md">
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => cambiarBusqueda(e.target.value)}
+              placeholder="Buscar por cédula, RUC o nombre..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => cambiarBusqueda("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                aria-label="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            )}
           </div>
-        ) : tokens.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No hay enlaces generados todavía.
+
+          <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+            {PESTANAS.map(({ valor, etiqueta }) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => cambiarEstado(valor)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  estado === valor
+                    ? "bg-primary-600 text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {etiqueta} ({datos.conteos[valor]})
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="pb-3 pr-4">Estado</th>
-                  <th className="pb-3 pr-4">Creado por</th>
-                  <th className="pb-3 pr-4">Creado el</th>
-                  <th className="pb-3 pr-4">Expira el</th>
-                  <th className="pb-3 pr-4">Cliente</th>
-                  <th className="pb-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {tokens.map((tkn) => {
-                  const estado = getEstado(tkn);
-                  return (
-                    <tr key={tkn.id} className="hover:bg-gray-50">
-                      <td className="py-3 pr-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${estado.color}`}
+
+          {loading && datos.items.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : datos.items.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {busqueda.trim()
+                ? "No se encontraron enlaces con esa búsqueda."
+                : "No hay enlaces en esta pestaña."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="pb-3 pr-4">Estado</th>
+                    <th className="pb-3 pr-4">Cliente</th>
+                    <th className="pb-3 pr-4">Vence en</th>
+                    <th className="pb-3 pr-4">Creado</th>
+                    <th className="pb-3 pr-4">Expira el</th>
+                    <th className="pb-3">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {datos.items.map((tkn) => {
+                    const estadoTkn = getEstado(tkn);
+                    const restante = tiempoRestante(tkn);
+                    return (
+                      <tr key={tkn.id} className="hover:bg-gray-50">
+                        <td className="py-3 pr-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${estadoTkn.color}`}
+                          >
+                            {estadoTkn.texto}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-gray-700">
+                          {tkn.nombre_compareciente && (
+                            <div className="font-medium text-gray-900">
+                              {tkn.nombre_compareciente}
+                            </div>
+                          )}
+                          <span className="text-xs text-gray-500 mr-1">
+                            {tkn.tipo_esperado === "empresa" ? "RUC" : "Doc."}
+                          </span>
+                          {tkn.documento_esperado || "-"}
+                        </td>
+                        <td
+                          className={`py-3 pr-4 whitespace-nowrap ${restante.clase}`}
                         >
-                          {estado.texto}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-gray-700">
-                        {tkn.creado_por || "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-gray-600">
-                        {formatearFecha(tkn.creado_en)}
-                      </td>
-                      <td
-                        className={`py-3 pr-4 ${estaExpirado(tkn.expira_en) && !tkn.usado ? "text-red-500" : "text-gray-600"}`}
-                      >
-                        {formatearFecha(tkn.expira_en)}
-                      </td>
-                      <td className="py-3 pr-4 text-gray-700">
-                        {tkn.nombre_compareciente && (
-                          <div className="font-medium text-gray-900">
-                            {tkn.nombre_compareciente}
+                          {restante.texto}
+                        </td>
+                        <td className="py-3 pr-4 text-gray-600">
+                          {formatearFecha(tkn.creado_en)}
+                          <div className="text-xs text-gray-400">
+                            {tkn.creado_por || "-"}
                           </div>
-                        )}
-                        <span className="text-xs text-gray-500 mr-1">
-                          {tkn.tipo_esperado === "empresa" ? "RUC" : "Doc."}
-                        </span>
-                        {tkn.documento_esperado || "-"}
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          {!tkn.usado &&
-                            !estaExpirado(tkn.expira_en) &&
-                            tkn.link && (
+                        </td>
+                        <td
+                          className={`py-3 pr-4 ${estaExpirado(tkn.expira_en) && !tkn.usado ? "text-red-500" : "text-gray-600"}`}
+                        >
+                          {formatearFecha(tkn.expira_en)}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-2">
+                            {!tkn.usado &&
+                              !estaExpirado(tkn.expira_en) &&
+                              tkn.link && (
+                                <button
+                                  onClick={() => copiarLink(tkn.link)}
+                                  className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                >
+                                  Copiar link
+                                </button>
+                              )}
+                            {!tkn.usado && (
                               <button
-                                onClick={() => copiarLink(tkn.link)}
-                                className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                onClick={() => eliminarToken(tkn.token)}
+                                className="text-red-500 hover:text-red-700 text-xs underline"
                               >
-                                Copiar link
+                                Eliminar
                               </button>
                             )}
-                          {!tkn.usado && (
-                            <button
-                              onClick={() => eliminarToken(tkn.token)}
-                              className="text-red-500 hover:text-red-700 text-xs underline"
-                            >
-                              Eliminar
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {datos.paginas > 1 && (
+            <div className="flex items-center justify-between pt-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                disabled={datos.pagina <= 1 || loading}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50"
+              >
+                ← Anterior
+              </button>
+              <span className="text-gray-600">
+                Página {datos.pagina} de {datos.paginas} · {datos.total}{" "}
+                {datos.total === 1 ? "enlace" : "enlaces"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.min(datos.paginas, p + 1))}
+                disabled={datos.pagina >= datos.paginas || loading}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50"
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );

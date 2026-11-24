@@ -1,8 +1,8 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class GenerarTokenRequest(BaseModel):
@@ -62,3 +62,27 @@ class RegistrationTokenResponse(BaseModel):
     creado_en: datetime
     expira_en: datetime
     creado_por: Optional[str]  # username del empleado
+
+    @field_validator("creado_en", "expira_en", "usado_en")
+    @classmethod
+    def marcar_utc(cls, valor):
+        # La base guarda las fechas en UTC sin zona; sin esto el navegador
+        # las lee como hora local y quedan corridas 5 horas
+        if valor is not None and valor.tzinfo is None:
+            return valor.replace(tzinfo=timezone.utc)
+        return valor
+
+
+class ConteosTokens(BaseModel):
+    pendiente: int
+    usado: int
+    expirado: int
+    todos: int
+
+
+class PaginaTokens(BaseModel):
+    items: list[RegistrationTokenResponse]
+    total: int
+    pagina: int
+    paginas: int
+    conteos: ConteosTokens
