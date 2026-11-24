@@ -1,12 +1,6 @@
-/**
- * Formulario de registro de comparecientes (UAFE).
- *
- * Es EL MISMO formulario para el cliente (link público) y para el personal de
- * la notaría (pantalla Comparecientes y creación desde una matriz). Quien lo
- * usa decide a dónde se envía con `onEnviar(payload)`.
- */
 import { useState, useEffect, useRef } from "react";
 import { ACTIVIDADES_ECONOMICAS } from "../../utils/actividadesEconomicas";
+import PAISES from "../../utils/paises";
 import {
   CONDICIONES_JURIDICAS,
   MODALIDADES_SOCIOS,
@@ -170,6 +164,10 @@ const personaInicial = () => ({
   birth_date: "",
   email: "",
   phone: "",
+  reside_extranjero: false,
+  pais_residencia: "",
+  ciudad_residencia: "",
+  direccion_extranjero: "",
   province: "",
   canton: "",
   parroquia: "",
@@ -207,6 +205,10 @@ const personaInicial = () => ({
 
 const empresaInicial = () => ({
   ruc: "",
+  es_extranjera: false,
+  pais_domicilio: "",
+  ciudad_domicilio: "",
+  direccion_extranjero: "",
   razon_social: "",
   patrimonio: patrimonioInicial(),
   email: "",
@@ -242,6 +244,10 @@ const empresaInicial = () => ({
   rep_birth_date: "",
   rep_email: "",
   rep_phone: "",
+  rep_reside_extranjero: false,
+  rep_pais_residencia: "",
+  rep_ciudad_residencia: "",
+  rep_direccion_extranjero: "",
   rep_province: "",
   rep_canton: "",
   rep_parroquia: "",
@@ -286,7 +292,12 @@ const LIMITES = {
   last_names: 100,
   nationality: 50,
   email: 100,
-  phone: 15,
+  phone: 20,
+  pais_residencia: 80,
+  ciudad_residencia: 100,
+  pais_domicilio: 80,
+  ciudad_domicilio: 100,
+  direccion_extranjero: 300,
   canton: 50,
   parroquia: 50,
   sector: 100,
@@ -305,7 +316,7 @@ const LIMITES = {
   pep_cargo: 200,
   pep_grado_relacion: 200,
   pep_relacion_tipo: 100,
-  ruc: 13,
+  ruc: 30,
   razon_social: 200,
   actividad_empresa: 200,
   position: 100,
@@ -324,7 +335,7 @@ const LIMITES = {
 
 const campoBase = (campo = "") =>
   String(campo)
-    .replace(/^(cr_|c_|r_|rep_)/, "")
+    .replace(/^(cr\d*_|c_|r\d*_|rep_)/, "")
     .replace(/^pat_/, "")
     .replace(/^.*_\d+_/, "");
 
@@ -344,6 +355,11 @@ const REQUERIDOS = new Set([
   "canton",
   "main_street",
   "secondary_street",
+  "pais_residencia",
+  "ciudad_residencia",
+  "direccion_extranjero",
+  "pais_domicilio",
+  "ciudad_domicilio",
   "occupation",
   "actividad_economica",
   "actividad_economica_otra",
@@ -385,6 +401,12 @@ const ETIQUETAS = {
   birth_date: "Fecha de nacimiento",
   email: "Correo electrónico",
   phone: "Teléfono",
+  reside_extranjero: "Lugar de residencia",
+  pais_residencia: "País de residencia",
+  ciudad_residencia: "Ciudad",
+  direccion_extranjero: "Dirección en el extranjero",
+  pais_domicilio: "País de domicilio",
+  ciudad_domicilio: "Ciudad",
   province: "Provincia",
   canton: "Cantón",
   parroquia: "Parroquia",
@@ -413,7 +435,7 @@ const ETIQUETAS = {
   pep_grado_relacion: "Grado de relación",
   pep_relacion_tipo: "Relación con el PEP",
   razon_exclusion_conyugue: "Razón de no comparecencia del cónyuge",
-  ruc: "RUC",
+  ruc: "RUC / identificación fiscal",
   razon_social: "Razón social",
   actividad_empresa: "Actividad económica principal",
   position: "Cargo",
@@ -425,9 +447,17 @@ const ETIQUETAS = {
 
 const SECCIONES = {
   c_: "Cónyuge",
-  r_: "Representado",
-  cr_: "Cónyuge del representado",
   rep_: "Representante legal",
+};
+
+// c_, rep_, r0_ (Representado 1), cr0_ (Cónyuge del representado 1)
+const PREFIJO_PERSONA = /^(cr\d+_|c_|r\d+_|rep_)/;
+const seccionDe = (prefijo) => {
+  const n = (prefijo.match(/\d+/) || [])[0];
+  if (n === undefined) return SECCIONES[prefijo];
+  return prefijo.startsWith("cr")
+    ? `Cónyuge del representado ${Number(n) + 1}`
+    : `Representado ${Number(n) + 1}`;
 };
 
 // "Representante legal · Número" — para el resumen de errores
@@ -463,7 +493,7 @@ const etiquetaPatrimonio = (resto) => {
 };
 
 const nombreCampo = (campo, esEmpresa) => {
-  const prefijo = (String(campo).match(/^(cr_|c_|r_|rep_)/) || [""])[0];
+  const prefijo = (String(campo).match(PREFIJO_PERSONA) || [""])[0];
   const base = campoBase(campo);
   const sinPrefijo = String(campo).replace(prefijo, "");
   const etiqueta = sinPrefijo.startsWith("patrimonio_")
@@ -472,7 +502,7 @@ const nombreCampo = (campo, esEmpresa) => {
       ETIQUETAS[String(campo).replace(prefijo, "").split("_")[0]] ||
       base.replace(/_/g, " ");
   const seccion = prefijo
-    ? SECCIONES[prefijo]
+    ? seccionDe(prefijo)
     : esEmpresa
       ? "Empresa"
       : "Sus datos";
@@ -497,8 +527,19 @@ const validarFormato = (datos, prefijo = "") => {
   if (numero && !PATRON_NUMERO_CASA.test(numero))
     e[`${p}number_street`] =
       'Escriba solo la numeración, por ejemplo E13-51 o S/N. Las indicaciones como "atrás de..." van en Referencia.';
-  const telefono = (datos[`${p}phone`] || "").replace(/[\s-]/g, "");
-  if (telefono && !/^\d{9,10}$/.test(telefono))
+  const telefono = (datos[`${p}phone`] || "").replace(/[\s\-().]/g, "");
+  const extranjero =
+    datos[`${p}reside_extranjero`] === true ||
+    (p === "" && datos.es_extranjera === true);
+  if (telefono && extranjero && !/^\+?\d{6,15}$/.test(telefono))
+    e[`${p}phone`] =
+      "Escriba el teléfono con el código del país, por ejemplo +1 305 555 1234.";
+  else if (
+    telefono &&
+    !extranjero &&
+    !/^\d{9,10}$/.test(telefono) &&
+    !/^\+?593\d{8,9}$/.test(telefono)
+  )
     e[`${p}phone`] = "El teléfono debe tener 9 o 10 dígitos, solo números.";
   const correo = (datos[`${p}email`] || "").trim();
   if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo))
@@ -517,6 +558,113 @@ const inputClass = (errors, field) =>
     errors[field] ? "border-red-400 bg-red-50" : "border-gray-300"
   }`;
 
+// País, ciudad y dirección libre para quien vive fuera del Ecuador
+const CAMPOS_EXTRANJERO = {
+  pais_residencia: "pais_residencia",
+  ciudad_residencia: "ciudad_residencia",
+  direccion_extranjero: "direccion_extranjero",
+};
+// La empresa usa sus propios nombres de campo para el domicilio
+const CAMPOS_EXTRANJERO_EMPRESA = {
+  pais_residencia: "pais_domicilio",
+  ciudad_residencia: "ciudad_domicilio",
+  direccion_extranjero: "direccion_extranjero",
+};
+
+const DireccionExtranjero = ({
+  datos,
+  onChange,
+  errors,
+  prefijo = "",
+  campos = CAMPOS_EXTRANJERO,
+}) => {
+  const campo = (c) => `${prefijo}${campos[c]}`;
+  const error = (c) =>
+    errors[campo(c)] && (
+      <p className="text-red-500 text-xs mt-1">{errors[campo(c)]}</p>
+    );
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          País
+        </label>
+        <select
+          value={datos[campo("pais_residencia")] || ""}
+          onChange={(e) => onChange(campo("pais_residencia"), e.target.value)}
+          className={inputClass(errors, campo("pais_residencia"))}
+          data-campo={campo("pais_residencia")}
+          data-requerido={requerido(campo("pais_residencia"))}
+        >
+          <option value="">Seleccione</option>
+          <optgroup label="Más frecuentes">
+            {PAISES_FRECUENTES.map((p) => (
+              <option key={`f-${p}`} value={p}>
+                {p}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Todos los países">
+            {PAISES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+        {error("pais_residencia")}
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Ciudad
+        </label>
+        <input
+          type="text"
+          value={datos[campo("ciudad_residencia")] || ""}
+          onChange={(e) => onChange(campo("ciudad_residencia"), e.target.value)}
+          className={inputClass(errors, campo("ciudad_residencia"))}
+          data-campo={campo("ciudad_residencia")}
+          data-requerido={requerido(campo("ciudad_residencia"))}
+          maxLength={largoMax(campo("ciudad_residencia"))}
+          placeholder="Ej: Madrid"
+        />
+        {error("ciudad_residencia")}
+      </div>
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Dirección
+        </label>
+        <textarea
+          value={datos[campo("direccion_extranjero")] || ""}
+          onChange={(e) =>
+            onChange(campo("direccion_extranjero"), e.target.value)
+          }
+          className={inputClass(errors, campo("direccion_extranjero"))}
+          data-campo={campo("direccion_extranjero")}
+          data-requerido={requerido(campo("direccion_extranjero"))}
+          maxLength={largoMax(campo("direccion_extranjero"))}
+          rows={2}
+          placeholder="Escriba su dirección como la usa en ese país. Ej: Calle Mayor 10, 3.º B, 28013"
+        />
+        {error("direccion_extranjero")}
+      </div>
+    </div>
+  );
+};
+
+const PAISES_FRECUENTES = [
+  "Estados Unidos",
+  "España",
+  "Italia",
+  "Colombia",
+  "Perú",
+  "Venezuela",
+  "Chile",
+  "Argentina",
+  "México",
+  "Canadá",
+];
+
 const SeccionDireccion = ({
   datos,
   onChange,
@@ -524,183 +672,228 @@ const SeccionDireccion = ({
   prefijo = "",
   titulo = "Dirección",
   numeroObligatorio = false,
-}) => (
-  <>
-    <h3 className="font-medium text-gray-700 pt-2 border-t">{titulo}</h3>
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Provincia
-        </label>
-        <select
-          value={datos[`${prefijo}province`]}
-          onChange={(e) => onChange(`${prefijo}province`, e.target.value)}
-          className={inputClass(errors, `${prefijo}province`)}
-          data-campo={`${prefijo}province`}
-          data-requerido={requerido(`${prefijo}province`)}
-        >
-          <option value="">Seleccione</option>
-          {PROVINCIAS_ECUADOR.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        {errors[`${prefijo}province`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}province`]}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Cantón
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}canton`]}
-          onChange={(e) => onChange(`${prefijo}canton`, e.target.value)}
-          className={inputClass(errors, `${prefijo}canton`)}
-          data-campo={`${prefijo}canton`}
-          data-requerido={requerido(`${prefijo}canton`)}
-          maxLength={largoMax(`${prefijo}canton`)}
-          placeholder="Ej: Quito"
+  permiteExtranjero = false, // personas: pueden vivir fuera del Ecuador
+}) => {
+  const extranjero =
+    permiteExtranjero && datos[`${prefijo}reside_extranjero`] === true;
+  return (
+    <>
+      <h3 className="font-medium text-gray-700 pt-2 border-t">{titulo}</h3>
+      {permiteExtranjero && (
+        <div>
+          <label className="requerido block text-sm font-medium text-gray-700 mb-1">
+            ¿Dónde reside?
+          </label>
+          <div className="flex gap-3">
+            {[
+              [false, "En Ecuador"],
+              [true, "En el extranjero"],
+            ].map(([valor, texto]) => (
+              <button
+                key={texto}
+                type="button"
+                onClick={() => onChange(`${prefijo}reside_extranjero`, valor)}
+                data-campo={valor ? undefined : `${prefijo}reside_extranjero`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                  (datos[`${prefijo}reside_extranjero`] === true) === valor
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {texto}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {extranjero ? (
+        <DireccionExtranjero
+          datos={datos}
+          onChange={onChange}
+          errors={errors}
+          prefijo={prefijo}
         />
-        {errors[`${prefijo}canton`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}canton`]}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Parroquia
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}parroquia`]}
-          onChange={(e) => onChange(`${prefijo}parroquia`, e.target.value)}
-          className={inputClass(errors, `${prefijo}parroquia`)}
-          data-campo={`${prefijo}parroquia`}
-          data-requerido={requerido(`${prefijo}parroquia`)}
-          maxLength={largoMax(`${prefijo}parroquia`)}
-          placeholder="Ej: Nayón"
-        />
-        {errors[`${prefijo}parroquia`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}parroquia`]}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Sector / Urbanización (opcional)
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}sector`]}
-          onChange={(e) => onChange(`${prefijo}sector`, e.target.value)}
-          className={inputClass(errors, `${prefijo}sector`)}
-          data-campo={`${prefijo}sector`}
-          data-requerido={requerido(`${prefijo}sector`)}
-          maxLength={largoMax(`${prefijo}sector`)}
-          placeholder="Ej: Valle Colores"
-        />
-        {errors[`${prefijo}sector`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}sector`]}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Calle Principal
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}main_street`]}
-          onChange={(e) => onChange(`${prefijo}main_street`, e.target.value)}
-          className={inputClass(errors, `${prefijo}main_street`)}
-          data-campo={`${prefijo}main_street`}
-          data-requerido={requerido(`${prefijo}main_street`)}
-          maxLength={largoMax(`${prefijo}main_street`)}
-          placeholder="Ej: Av. Los Eucaliptos"
-        />
-        {errors[`${prefijo}main_street`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}main_street`]}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Calle Secundaria
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}secondary_street`]}
-          onChange={(e) =>
-            onChange(`${prefijo}secondary_street`, e.target.value)
-          }
-          className={inputClass(errors, `${prefijo}secondary_street`)}
-          data-campo={`${prefijo}secondary_street`}
-          data-requerido={requerido(`${prefijo}secondary_street`)}
-          maxLength={largoMax(`${prefijo}secondary_street`)}
-          placeholder="Ej: Calle Eugenio Espejo"
-        />
-        {errors[`${prefijo}secondary_street`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}secondary_street`]}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Número
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}number_street`]}
-          onChange={(e) => onChange(`${prefijo}number_street`, e.target.value)}
-          className={inputClass(errors, `${prefijo}number_street`)}
-          data-campo={`${prefijo}number_street`}
-          data-requerido={numeroObligatorio || undefined}
-          maxLength={largoMax(`${prefijo}number_street`)}
-          placeholder="Ej: E13-51 o S/N"
-        />
-        {errors[`${prefijo}number_street`] ? (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}number_street`]}
-          </p>
-        ) : (
-          <p className="text-gray-400 text-xs mt-1">
-            Solo la numeración de la casa o edificio.
-          </p>
-        )}
-      </div>
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Referencia (opcional)
-        </label>
-        <input
-          type="text"
-          value={datos[`${prefijo}referencia`] || ""}
-          onChange={(e) => onChange(`${prefijo}referencia`, e.target.value)}
-          className={inputClass(errors, `${prefijo}referencia`)}
-          data-campo={`${prefijo}referencia`}
-          data-requerido={requerido(`${prefijo}referencia`)}
-          maxLength={largoMax(`${prefijo}referencia`)}
-          placeholder="Ej: atrás de SOLCA, edificio Torres del Norte, departamento 3B"
-        />
-        {errors[`${prefijo}referencia`] && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors[`${prefijo}referencia`]}
-          </p>
-        )}
-      </div>
-    </div>
-  </>
-);
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Provincia
+            </label>
+            <select
+              value={datos[`${prefijo}province`]}
+              onChange={(e) => onChange(`${prefijo}province`, e.target.value)}
+              className={inputClass(errors, `${prefijo}province`)}
+              data-campo={`${prefijo}province`}
+              data-requerido={requerido(`${prefijo}province`)}
+            >
+              <option value="">Seleccione</option>
+              {PROVINCIAS_ECUADOR.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            {errors[`${prefijo}province`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}province`]}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cantón
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}canton`]}
+              onChange={(e) => onChange(`${prefijo}canton`, e.target.value)}
+              className={inputClass(errors, `${prefijo}canton`)}
+              data-campo={`${prefijo}canton`}
+              data-requerido={requerido(`${prefijo}canton`)}
+              maxLength={largoMax(`${prefijo}canton`)}
+              placeholder="Ej: Quito"
+            />
+            {errors[`${prefijo}canton`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}canton`]}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Parroquia
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}parroquia`]}
+              onChange={(e) => onChange(`${prefijo}parroquia`, e.target.value)}
+              className={inputClass(errors, `${prefijo}parroquia`)}
+              data-campo={`${prefijo}parroquia`}
+              data-requerido={requerido(`${prefijo}parroquia`)}
+              maxLength={largoMax(`${prefijo}parroquia`)}
+              placeholder="Ej: Nayón"
+            />
+            {errors[`${prefijo}parroquia`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}parroquia`]}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sector / Urbanización (opcional)
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}sector`]}
+              onChange={(e) => onChange(`${prefijo}sector`, e.target.value)}
+              className={inputClass(errors, `${prefijo}sector`)}
+              data-campo={`${prefijo}sector`}
+              data-requerido={requerido(`${prefijo}sector`)}
+              maxLength={largoMax(`${prefijo}sector`)}
+              placeholder="Ej: Valle Colores"
+            />
+            {errors[`${prefijo}sector`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}sector`]}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Calle Principal
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}main_street`]}
+              onChange={(e) =>
+                onChange(`${prefijo}main_street`, e.target.value)
+              }
+              className={inputClass(errors, `${prefijo}main_street`)}
+              data-campo={`${prefijo}main_street`}
+              data-requerido={requerido(`${prefijo}main_street`)}
+              maxLength={largoMax(`${prefijo}main_street`)}
+              placeholder="Ej: Av. Los Eucaliptos"
+            />
+            {errors[`${prefijo}main_street`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}main_street`]}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Calle Secundaria
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}secondary_street`]}
+              onChange={(e) =>
+                onChange(`${prefijo}secondary_street`, e.target.value)
+              }
+              className={inputClass(errors, `${prefijo}secondary_street`)}
+              data-campo={`${prefijo}secondary_street`}
+              data-requerido={requerido(`${prefijo}secondary_street`)}
+              maxLength={largoMax(`${prefijo}secondary_street`)}
+              placeholder="Ej: Calle Eugenio Espejo"
+            />
+            {errors[`${prefijo}secondary_street`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}secondary_street`]}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Número
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}number_street`]}
+              onChange={(e) =>
+                onChange(`${prefijo}number_street`, e.target.value)
+              }
+              className={inputClass(errors, `${prefijo}number_street`)}
+              data-campo={`${prefijo}number_street`}
+              data-requerido={numeroObligatorio || undefined}
+              maxLength={largoMax(`${prefijo}number_street`)}
+              placeholder="Ej: E13-51 o S/N"
+            />
+            {errors[`${prefijo}number_street`] ? (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}number_street`]}
+              </p>
+            ) : (
+              <p className="text-gray-400 text-xs mt-1">
+                Solo la numeración de la casa o edificio.
+              </p>
+            )}
+          </div>
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Referencia (opcional)
+            </label>
+            <input
+              type="text"
+              value={datos[`${prefijo}referencia`] || ""}
+              onChange={(e) => onChange(`${prefijo}referencia`, e.target.value)}
+              className={inputClass(errors, `${prefijo}referencia`)}
+              data-campo={`${prefijo}referencia`}
+              data-requerido={requerido(`${prefijo}referencia`)}
+              maxLength={largoMax(`${prefijo}referencia`)}
+              placeholder="Ej: atrás de SOLCA, edificio Torres del Norte, departamento 3B"
+            />
+            {errors[`${prefijo}referencia`] && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`${prefijo}referencia`]}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 // Checkbox cónyuge no comparece
 const SeccionConyugue = ({ datos, onChange, errors, prefijo = "" }) => {
@@ -1910,6 +2103,9 @@ const SeccionUAFE = ({
   esRepresentado = false,
   tituloFinanciero = "Información Financiera",
   patrimonioDe = "DECLARANTE",
+  compartePatrimonio = false,
+  onToggleComparte, // solo cónyuges: usar la situación patrimonial del otro
+  conyugeDe = "",
 }) => {
   const esPepDirecto = datos[`${prefijo}es_pep`] === "si";
   const noesPep = datos[`${prefijo}es_pep`] === "no";
@@ -2229,13 +2425,36 @@ const SeccionUAFE = ({
         </div>
       )}
 
-      <SeccionPatrimonio
-        datos={datos}
-        onChange={onChange}
-        errors={errors}
-        prefijo={prefijo}
-        de={esRepresentanteEmpresa ? "REPRESENTANTE LEGAL" : patrimonioDe}
-      />
+      {onToggleComparte !== undefined && (
+        <label className="flex items-center gap-2 cursor-pointer pt-2 border-t">
+          <input
+            type="checkbox"
+            checked={compartePatrimonio}
+            onChange={onToggleComparte}
+            className="w-4 h-4 rounded text-blue-600"
+          />
+          <span className="text-sm text-gray-700">
+            Comparte la situación patrimonial con su cónyuge
+            {conyugeDe ? ` (${conyugeDe})` : ""}
+          </span>
+        </label>
+      )}
+      {onToggleComparte !== undefined && compartePatrimonio ? (
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <p className="text-sm text-gray-500">
+            ✓ Usando la misma situación patrimonial
+            {conyugeDe ? ` de ${conyugeDe}` : " de su cónyuge"}
+          </p>
+        </div>
+      ) : (
+        <SeccionPatrimonio
+          datos={datos}
+          onChange={onChange}
+          errors={errors}
+          prefijo={prefijo}
+          de={esRepresentanteEmpresa ? "REPRESENTANTE LEGAL" : patrimonioDe}
+        />
+      )}
     </>
   );
 };
@@ -2255,10 +2474,19 @@ const FormularioPersona = ({
   onToggleMismaDir,
   documentoFijo = false,
   patrimonioDe = "DECLARANTE",
+  prefijoErrores = "", // c_, r0_, cr0_: para ubicar el campo desde el resumen de errores
+  encabezado = null,
+  compartePatrimonio = false,
+  onToggleComparte,
+  conyugeDe = "",
 }) => (
-  <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-    <h2 className="font-semibold text-gray-800 text-lg border-b pb-2">
-      {titulo}
+  <div
+    className="bg-white rounded-xl shadow-sm p-6 space-y-4"
+    data-prefijo={prefijoErrores || undefined}
+  >
+    <h2 className="font-semibold text-gray-800 text-lg border-b pb-2 flex items-center justify-between gap-3">
+      <span>{titulo}</span>
+      {encabezado}
     </h2>
 
     <div className="grid grid-cols-2 gap-4">
@@ -2466,11 +2694,17 @@ const FormularioPersona = ({
           className={inputClass(errors, "phone")}
           data-campo={"phone"}
           data-requerido={requerido("phone")}
-          placeholder="0987654321"
-          maxLength={10}
+          placeholder={
+            datos.reside_extranjero === true ? "+1 305 555 1234" : "0987654321"
+          }
+          maxLength={largoMax("phone")}
         />
-        {errors.phone && (
+        {errors.phone ? (
           <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+        ) : (
+          <p className="text-gray-400 text-xs mt-1">
+            Si vive fuera del Ecuador, incluya el código del país.
+          </p>
         )}
       </div>
     </div>
@@ -2490,7 +2724,12 @@ const FormularioPersona = ({
     )}
 
     {!onToggleMismaDir || !mismaDir ? (
-      <SeccionDireccion datos={datos} onChange={onChange} errors={errors} />
+      <SeccionDireccion
+        datos={datos}
+        onChange={onChange}
+        errors={errors}
+        permiteExtranjero
+      />
     ) : (
       <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <p className="text-sm text-gray-500">
@@ -2546,6 +2785,9 @@ const FormularioPersona = ({
       mostrarOrigenFondos={mostrarRolTramite}
       esRepresentado={esRepresentado}
       patrimonioDe={patrimonioDe}
+      compartePatrimonio={compartePatrimonio}
+      onToggleComparte={onToggleComparte}
+      conyugeDe={conyugeDe}
     />
   </div>
 );
@@ -2563,25 +2805,63 @@ const FormularioEmpresa = ({
     <h2 className="font-semibold text-gray-800 text-lg border-b pb-2">
       Datos de la Empresa
     </h2>
+    <div>
+      <label className="requerido block text-sm font-medium text-gray-700 mb-1">
+        ¿Dónde está domiciliada la empresa?
+      </label>
+      <div className="flex gap-3">
+        {[
+          [false, "En Ecuador"],
+          [true, "En el extranjero"],
+        ].map(([valor, texto]) => (
+          <button
+            key={texto}
+            type="button"
+            disabled={documentoFijo}
+            onClick={() => onChange("es_extranjera", valor)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium disabled:cursor-not-allowed ${
+              (datos.es_extranjera === true) === valor
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+            }`}
+          >
+            {texto}
+          </button>
+        ))}
+      </div>
+    </div>
     <div className="grid grid-cols-2 gap-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          RUC
+          {datos.es_extranjera
+            ? "Número de identificación fiscal o tributaria del país de domicilio"
+            : "RUC"}
         </label>
         <input
           type="text"
           value={datos.ruc}
-          onChange={(e) => onChange("ruc", e.target.value)}
+          onChange={(e) =>
+            onChange(
+              "ruc",
+              datos.es_extranjera
+                ? e.target.value.toUpperCase()
+                : e.target.value,
+            )
+          }
           className={inputClass(errors, "ruc")}
           data-campo={"ruc"}
           data-requerido={requerido("ruc")}
-          placeholder="0000000000001"
-          maxLength={13}
+          placeholder={
+            datos.es_extranjera ? "Ej: 900.123.456-7" : "0000000000001"
+          }
+          maxLength={datos.es_extranjera ? 30 : 13}
           readOnly={documentoFijo}
         />
         {documentoFijo && (
           <p className="text-xs text-gray-500 mt-1">
-            Este RUC no se puede cambiar.
+            {datos.es_extranjera
+              ? "Esta identificación no se puede cambiar."
+              : "Este RUC no se puede cambiar."}
           </p>
         )}
 
@@ -2643,21 +2923,35 @@ const FormularioEmpresa = ({
           className={inputClass(errors, "phone")}
           data-campo={"phone"}
           data-requerido={requerido("phone")}
-          placeholder="0987654321"
-          maxLength={10}
+          placeholder={datos.es_extranjera ? "+57 601 555 1234" : "0987654321"}
+          maxLength={datos.es_extranjera ? 20 : 10}
         />
         {errors.phone && (
           <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
         )}
       </div>
     </div>
-    <SeccionDireccion
-      datos={datos}
-      onChange={onChange}
-      errors={errors}
-      titulo="Dirección de la Empresa"
-      numeroObligatorio
-    />
+    {datos.es_extranjera ? (
+      <>
+        <h3 className="font-medium text-gray-700 pt-2 border-t">
+          Dirección de la Empresa
+        </h3>
+        <DireccionExtranjero
+          datos={datos}
+          onChange={onChange}
+          errors={errors}
+          campos={CAMPOS_EXTRANJERO_EMPRESA}
+        />
+      </>
+    ) : (
+      <SeccionDireccion
+        datos={datos}
+        onChange={onChange}
+        errors={errors}
+        titulo="Dirección de la Empresa"
+        numeroObligatorio
+      />
+    )}
     <h3 className="font-medium text-gray-700 pt-2 border-t">
       Información Financiera de la Empresa
     </h3>
@@ -2987,11 +3281,19 @@ const FormularioEmpresa = ({
             className={inputClass(errors, "rep_phone")}
             data-campo={"rep_phone"}
             data-requerido={requerido("rep_phone")}
-            placeholder="0987654321"
-            maxLength={10}
+            placeholder={
+              datos.rep_reside_extranjero === true
+                ? "+1 305 555 1234"
+                : "0987654321"
+            }
+            maxLength={largoMax("rep_phone")}
           />
-          {errors.rep_phone && (
+          {errors.rep_phone ? (
             <p className="text-red-500 text-xs mt-1">{errors.rep_phone}</p>
+          ) : (
+            <p className="text-gray-400 text-xs mt-1">
+              Si vive fuera del Ecuador, incluya el código del país.
+            </p>
           )}
         </div>
         <div>
@@ -3039,7 +3341,8 @@ const FormularioEmpresa = ({
         errors={errors}
         prefijo="rep_"
         titulo="Dirección del Representante Legal"
-        numeroObligatorio
+        numeroObligatorio={datos.rep_reside_extranjero !== true}
+        permiteExtranjero
       />
       <SeccionUAFE
         datos={datos}
@@ -3120,6 +3423,41 @@ const conPrefijo = (errores, prefijo) =>
     Object.entries(errores).map(([campo, msg]) => [prefijo + campo, msg]),
   );
 
+const CAMPOS_DIRECCION = [
+  "reside_extranjero",
+  "pais_residencia",
+  "ciudad_residencia",
+  "direccion_extranjero",
+  "province",
+  "canton",
+  "parroquia",
+  "sector",
+  "main_street",
+  "secondary_street",
+  "number_street",
+  "referencia",
+];
+
+// Copia la dirección de una persona a otra (cónyuge con la misma dirección)
+const direccionDe = (datos) =>
+  Object.fromEntries(CAMPOS_DIRECCION.map((c) => [c, datos[c]]));
+
+const validarResidencia = (datos, p = "") => {
+  const e = {};
+  const vacio = (c) => !String(datos[`${p}${c}`] || "").trim();
+  if (datos[`${p}reside_extranjero`] === true) {
+    if (vacio("pais_residencia")) e[`${p}pais_residencia`] = "Requerido";
+    if (vacio("ciudad_residencia")) e[`${p}ciudad_residencia`] = "Requerido";
+    if (String(datos[`${p}direccion_extranjero`] || "").trim().length < 5)
+      e[`${p}direccion_extranjero`] = "Escriba la dirección completa.";
+  } else {
+    ["province", "canton", "main_street", "secondary_street"].forEach((c) => {
+      if (vacio(c)) e[`${p}${c}`] = "Requerido";
+    });
+  }
+  return e;
+};
+
 const validarPersona = (datos, prefijo = "") => {
   const e = {};
   const p = prefijo;
@@ -3137,10 +3475,7 @@ const validarPersona = (datos, prefijo = "") => {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos[`${p}email`]))
     e[`${p}email`] = "Correo electrónico inválido.";
   if (!datos[`${p}phone`]) e[`${p}phone`] = "Requerido";
-  if (!datos[`${p}province`]) e[`${p}province`] = "Requerido";
-  if (!datos[`${p}canton`]) e[`${p}canton`] = "Requerido";
-  if (!datos[`${p}main_street`]) e[`${p}main_street`] = "Requerido";
-  if (!datos[`${p}secondary_street`]) e[`${p}secondary_street`] = "Requerido";
+  Object.assign(e, validarResidencia(datos, p));
   if (!datos[`${p}occupation`]) e[`${p}occupation`] = "Requerido";
   return { ...validarFormato(datos, p), ...e };
 };
@@ -3324,18 +3659,35 @@ const validarSocios = (datos) => {
   return e;
 };
 
+// NIT, EIN, CIF...: letras, números, puntos y guiones
+const PATRON_ID_EXTRANJERA = /^[A-Z0-9][A-Z0-9.-]{1,28}[A-Z0-9]$/;
+
 const validarEmpresa = (datos) => {
   const e = {};
+  const extranjera = datos.es_extranjera === true;
   if (!datos.ruc) e.ruc = "Requerido";
-  else if (!/^\d{13}$/.test(datos.ruc)) e.ruc = "El RUC debe tener 13 dígitos.";
+  else if (extranjera) {
+    if (!PATRON_ID_EXTRANJERA.test(datos.ruc.trim().toUpperCase()))
+      e.ruc =
+        "Escriba la identificación fiscal con letras, números, puntos o guiones (de 3 a 30).";
+  } else if (!/^\d{13}$/.test(datos.ruc))
+    e.ruc = "El RUC debe tener 13 dígitos.";
   if (!datos.razon_social?.trim()) e.razon_social = "Requerido";
   if (!datos.email) e.email = "Requerido";
   if (!datos.phone) e.phone = "Requerido";
-  if (!datos.province) e.province = "Requerido";
-  if (!datos.canton) e.canton = "Requerido";
-  if (!datos.main_street) e.main_street = "Requerido";
-  if (!datos.secondary_street) e.secondary_street = "Requerido";
-  if (!datos.number_street) e.number_street = "Requerido";
+  if (extranjera) {
+    if (!datos.pais_domicilio) e.pais_domicilio = "Requerido";
+    if (!(datos.ciudad_domicilio || "").trim())
+      e.ciudad_domicilio = "Requerido";
+    if ((datos.direccion_extranjero || "").trim().length < 5)
+      e.direccion_extranjero = "Escriba la dirección completa.";
+  } else {
+    if (!datos.province) e.province = "Requerido";
+    if (!datos.canton) e.canton = "Requerido";
+    if (!datos.main_street) e.main_street = "Requerido";
+    if (!datos.secondary_street) e.secondary_street = "Requerido";
+    if (!datos.number_street) e.number_street = "Requerido";
+  }
   if (!datos.actividad_empresa?.trim()) e.actividad_empresa = "Requerido";
   if (!datos.ingreso_mensual) e.ingreso_mensual = "Requerido";
   if (!datos.egreso_mensual) e.egreso_mensual = "Requerido";
@@ -3353,7 +3705,8 @@ const validarEmpresa = (datos) => {
   const errorsPatrimonio = validarPatrimonio(datos, "", true);
   const errorsRep = validarPersona(datos, "rep_");
   // La empresa exige número en la dirección del representante (backend)
-  if (!datos.rep_number_street) errorsRep.rep_number_street = "Requerido";
+  if (datos.rep_reside_extranjero !== true && !datos.rep_number_street)
+    errorsRep.rep_number_street = "Requerido";
   if (!datos.rep_position) errorsRep.rep_position = "Requerido";
   const errorsRepUAFE = validarUAFE(datos, "rep_", false);
   const formatoEmpresa = Object.fromEntries(
@@ -3387,6 +3740,10 @@ const IDENTIDAD_PERSONA = [
   "birth_date",
   "email",
   "phone",
+  "reside_extranjero",
+  "pais_residencia",
+  "ciudad_residencia",
+  "direccion_extranjero",
   "province",
   "canton",
   "parroquia",
@@ -3400,6 +3757,10 @@ const IDENTIDAD_PERSONA = [
 ];
 const IDENTIDAD_EMPRESA = [
   "ruc",
+  "es_extranjera",
+  "pais_domicilio",
+  "ciudad_domicilio",
+  "direccion_extranjero",
   "razon_social",
   "email",
   "phone",
@@ -3421,10 +3782,49 @@ const precargar = (base, datos, campos) => {
   if (!datos) return base;
   const r = { ...base };
   campos.forEach((c) => {
-    if (datos[c] !== undefined && datos[c] !== null) r[c] = String(datos[c]);
+    if (datos[c] === undefined || datos[c] === null) return;
+    r[c] = typeof datos[c] === "boolean" ? datos[c] : String(datos[c]);
   });
   return r;
 };
+
+const MAX_REPRESENTADOS = 20;
+
+// El cónyuge que comparte la situación patrimonial recibe una copia, marcada
+const patrimonioCompartido = (pat) => {
+  const limpio = limpiarPatrimonio(pat);
+  return limpio ? { ...limpio, compartida_con_conyuge: true } : null;
+};
+const sinErroresPatrimonio = (errores, prefijo) =>
+  Object.fromEntries(
+    Object.entries(errores).filter(
+      ([k]) => !k.startsWith(`${prefijo}patrimonio`),
+    ),
+  );
+const nombreDe = (d) =>
+  [d.names, d.last_names].filter((x) => (x || "").trim()).join(" ");
+
+let siguienteClave = 0;
+const representadoInicial = () => ({
+  clave: (siguienteClave += 1),
+  datos: personaInicial(),
+  conyugue: personaInicial(),
+  mismaDir: true,
+  compartePatrimonio: false,
+});
+
+const representadoVacio = (r) =>
+  !r.datos.document_number.trim() &&
+  !r.datos.names.trim() &&
+  !r.datos.last_names.trim();
+
+// Errores de una persona sin su prefijo (c_names -> names)
+const erroresDe = (errors, prefijo) =>
+  Object.fromEntries(
+    Object.entries(errors)
+      .filter(([k]) => k.startsWith(prefijo))
+      .map(([k, v]) => [k.slice(prefijo.length), v]),
+  );
 
 const tipoDocumento = (doc) =>
   /^\d{10}$/.test(doc || "") ? "cedula" : "pasaporte";
@@ -3434,6 +3834,7 @@ const FormularioRegistro = ({
   documento = "", // cédula/pasaporte del titular o RUC de la empresa
   documentoFijo = false,
   datosIniciales = null, // identidad para precargar: {titular, conyugue} o {empresa}
+  tipoDocumento: tipoDocumentoFijo = null, // cedula o pasaporte (viene del link)
   onEnviar, // async (payload) => void; lanza Error(mensaje) si falla
   encabezado = true, // logo y título de la notaría
   textoBoton = "Enviar mis datos",
@@ -3451,27 +3852,34 @@ const FormularioRegistro = ({
     );
     if (documento && tipo !== "empresa") {
       base.document_number = documento;
-      base.document_type = tipoDocumento(documento);
+      base.document_type =
+        tipoDocumentoFijo ||
+        datosIniciales?.titular?.document_type ||
+        tipoDocumento(documento);
     }
     return base;
   });
   const [conyugue, setConyugue] = useState(() =>
     precargar(personaInicial(), datosIniciales?.conyugue, IDENTIDAD_PERSONA),
   );
-  const [representado, setRepresentado] = useState(personaInicial());
-  const [conyugueRepresentado, setConyugueRepresentado] =
-    useState(personaInicial());
+  const [representados, setRepresentados] = useState(() => [
+    representadoInicial(),
+  ]);
   const [empresa, setEmpresa] = useState(() => {
     const base = precargar(
       empresaInicial(),
       datosIniciales?.empresa,
       IDENTIDAD_EMPRESA,
     );
-    if (documento && tipo === "empresa") base.ruc = documento;
+    if (documento && tipo === "empresa") {
+      base.ruc = documento;
+      if (tipoDocumentoFijo)
+        base.es_extranjera = tipoDocumentoFijo === "extranjera";
+    }
     return base;
   });
   const [mismaDir, setMismaDir] = useState(!datosIniciales?.conyugue);
-  const [mismaDirRepresentado, setMismaDirRepresentado] = useState(true);
+  const [compartePatrimonio, setCompartePatrimonio] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
@@ -3483,9 +3891,14 @@ const FormularioRegistro = ({
 
   // Lleva al campo con error (desde el resumen de errores)
   const irAlCampo = (campo) => {
-    const el = inicioRef.current?.querySelector(
-      `[data-campo="${CSS.escape(campo)}"]`,
-    );
+    // c_, r0_, cr0_: los campos de esas personas están dentro de su bloque
+    const prefijo = (campo.match(/^(cr\d+_|c_|r\d+_)/) || [""])[0];
+    const selector = prefijo
+      ? `[data-prefijo="${prefijo}"] [data-campo="${CSS.escape(campo.slice(prefijo.length))}"]`
+      : `[data-campo="${CSS.escape(campo)}"]`;
+    const el =
+      inicioRef.current?.querySelector(selector) ||
+      inicioRef.current?.querySelector(`[data-campo="${CSS.escape(campo)}"]`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       el.focus?.({ preventScroll: true });
@@ -3493,12 +3906,10 @@ const FormularioRegistro = ({
   };
 
   const esCasadoTitular = titular.marital_status === "casado";
-  const esCasadoRepresentado = representado.marital_status === "casado";
   const titularConyugueComparece = titular.conyugue_comparece !== false;
-  const representadoConyugueComparece =
-    representado.conyugue_comparece !== false;
 
   // Sincronizar dirección del cónyuge del titular
+  const direccionTitular = JSON.stringify(direccionDe(titular));
   useEffect(() => {
     if (
       mismaDir &&
@@ -3506,59 +3917,9 @@ const FormularioRegistro = ({
       calidadParticipacion &&
       calidadParticipacion !== "representando"
     ) {
-      setConyugue((prev) => ({
-        ...prev,
-        province: titular.province,
-        canton: titular.canton,
-        parroquia: titular.parroquia,
-        sector: titular.sector,
-        main_street: titular.main_street,
-        secondary_street: titular.secondary_street,
-        number_street: titular.number_street,
-        referencia: titular.referencia,
-      }));
+      setConyugue((prev) => ({ ...prev, ...JSON.parse(direccionTitular) }));
     }
-  }, [
-    mismaDir,
-    esCasadoTitular,
-    calidadParticipacion,
-    titular.province,
-    titular.canton,
-    titular.parroquia,
-    titular.sector,
-    titular.main_street,
-    titular.secondary_street,
-    titular.number_street,
-    titular.referencia,
-  ]);
-
-  // Sincronizar dirección del cónyuge del representado
-  useEffect(() => {
-    if (mismaDirRepresentado && esCasadoRepresentado) {
-      setConyugueRepresentado((prev) => ({
-        ...prev,
-        province: representado.province,
-        canton: representado.canton,
-        parroquia: representado.parroquia,
-        sector: representado.sector,
-        main_street: representado.main_street,
-        secondary_street: representado.secondary_street,
-        number_street: representado.number_street,
-        referencia: representado.referencia,
-      }));
-    }
-  }, [
-    mismaDirRepresentado,
-    esCasadoRepresentado,
-    representado.province,
-    representado.canton,
-    representado.parroquia,
-    representado.sector,
-    representado.main_street,
-    representado.secondary_street,
-    representado.number_street,
-    representado.referencia,
-  ]);
+  }, [mismaDir, esCasadoTitular, calidadParticipacion, direccionTitular]);
 
   const handleTitularChange = (field, value) => {
     setTitular((prev) => ({ ...prev, [field]: value }));
@@ -3569,16 +3930,50 @@ const FormularioRegistro = ({
     if (errors[`c_${field}`])
       setErrors((prev) => ({ ...prev, [`c_${field}`]: "" }));
   };
-  const handleRepresentadoChange = (field, value) => {
-    setRepresentado((prev) => ({ ...prev, [field]: value }));
-    if (errors[`r_${field}`])
-      setErrors((prev) => ({ ...prev, [`r_${field}`]: "" }));
+  // Representados: cada uno con sus datos y los de su cónyuge
+  const cambiarRepresentado = (i, parte, field, value) => {
+    setRepresentados((prev) =>
+      prev.map((r, j) =>
+        j === i ? { ...r, [parte]: { ...r[parte], [field]: value } } : r,
+      ),
+    );
+    const clave = `${parte === "datos" ? "r" : "cr"}${i}_${field}`;
+    if (errors[clave]) setErrors((prev) => ({ ...prev, [clave]: "" }));
   };
-  const handleConyugueRepresentadoChange = (field, value) => {
-    setConyugueRepresentado((prev) => ({ ...prev, [field]: value }));
-    if (errors[`cr_${field}`])
-      setErrors((prev) => ({ ...prev, [`cr_${field}`]: "" }));
+  const toggleMismaDirRepresentado = (i) =>
+    setRepresentados((prev) =>
+      prev.map((r, j) => (j === i ? { ...r, mismaDir: !r.mismaDir } : r)),
+    );
+  const toggleComparteRepresentado = (i) =>
+    setRepresentados((prev) =>
+      prev.map((r, j) =>
+        j === i ? { ...r, compartePatrimonio: !r.compartePatrimonio } : r,
+      ),
+    );
+  const agregarRepresentado = () =>
+    setRepresentados((prev) =>
+      prev.length >= MAX_REPRESENTADOS
+        ? prev
+        : [...prev, representadoInicial()],
+    );
+  const quitarRepresentado = (i) => {
+    setRepresentados((prev) => prev.filter((_, j) => j !== i));
+    // Los errores van por posición: se limpian para no mostrarlos en otro
+    setErrors((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).filter(([k]) => !/^(cr|r)\d+_/.test(k)),
+      ),
+    );
   };
+  // ¿Uno de los representados es su cónyuge? (solo si el titular está casado)
+  const representaConyuge =
+    calidadParticipacion === "propios_y_representando" &&
+    esCasadoTitular &&
+    representadoEsConyugue === true;
+  // Si representa a su cónyuge, puede no haber más representados
+  const minimoRepresentados = representaConyuge ? 0 : 1;
+  const conyugeDelRepresentado = (r) =>
+    r.mismaDir ? { ...r.conyugue, ...direccionDe(r.datos) } : r.conyugue;
   const handleEmpresaChange = (field, value) => {
     setEmpresa((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
@@ -3611,27 +4006,17 @@ const FormularioRegistro = ({
         esCasadoTitular &&
         titularConyugueComparece
       ) {
-        if (
-          calidadParticipacion === "propios_y_representando" &&
-          representadoEsConyugue
-        ) {
-          // No validar cónyuge separado
-        } else {
+        {
+          // Si es uno de los representados, también declara su rol en el trámite
           const errC = {
             ...conPrefijo(validarPersona(conyugue), "c_"),
-            ...conPrefijo(validarUAFE(conyugue, "", false), "c_"),
+            ...conPrefijo(validarUAFE(conyugue, "", representaConyuge), "c_"),
           };
-          if (mismaDir)
-            [
-              "c_province",
-              "c_canton",
-              "c_parroquia",
-              "c_main_street",
-              "c_secondary_street",
-              "c_number_street",
-              "c_referencia",
-            ].forEach((k) => delete errC[k]);
-          e = { ...e, ...errC };
+          if (mismaDir) CAMPOS_DIRECCION.forEach((c) => delete errC[`c_${c}`]);
+          e = {
+            ...e,
+            ...(compartePatrimonio ? sinErroresPatrimonio(errC, "c_") : errC),
+          };
         }
       }
 
@@ -3642,42 +4027,53 @@ const FormularioRegistro = ({
       ) {
         if (
           calidadParticipacion === "propios_y_representando" &&
+          esCasadoTitular &&
           representadoEsConyugue === null
         )
           e.representadoEsConyugue = "Requerido";
+        if (representados.length < minimoRepresentados)
+          e.representados = "Agregue los datos de al menos un representado.";
 
-        const usarRepresentadoSeparado = !(
-          calidadParticipacion === "propios_y_representando" &&
-          representadoEsConyugue
-        );
-        if (usarRepresentadoSeparado) {
-          const errR = {
-            ...conPrefijo(validarPersona(representado), "r_"),
-            ...conPrefijo(validarUAFE(representado, "", true), "r_"),
+        representados.forEach((r, n) => {
+          e = {
+            ...e,
+            ...conPrefijo(validarPersona(r.datos), `r${n}_`),
+            ...conPrefijo(validarUAFE(r.datos, "", true), `r${n}_`),
           };
-          e = { ...e, ...errR };
-          // Cónyuge del representado
-          if (esCasadoRepresentado && representadoConyugueComparece) {
-            const errCR = {
-              ...conPrefijo(validarPersona(conyugueRepresentado), "cr_"),
-              ...conPrefijo(
-                validarUAFE(conyugueRepresentado, "", false),
-                "cr_",
-              ),
+          if (!r.datos.marital_status) e[`r${n}_marital_status`] = "Requerido";
+          if (
+            r.datos.marital_status === "casado" &&
+            r.datos.conyugue_comparece !== false
+          ) {
+            const errCR = conPrefijo(
+              {
+                ...validarPersona(conyugeDelRepresentado(r)),
+                ...validarUAFE(r.conyugue, "", false),
+              },
+              `cr${n}_`,
+            );
+            e = {
+              ...e,
+              ...(r.compartePatrimonio
+                ? sinErroresPatrimonio(errCR, `cr${n}_`)
+                : errCR),
             };
-            if (mismaDirRepresentado)
-              [
-                "cr_province",
-                "cr_canton",
-                "cr_parroquia",
-                "cr_main_street",
-                "cr_secondary_street",
-                "cr_number_street",
-                "cr_referencia",
-              ].forEach((k) => delete errCR[k]);
-            e = { ...e, ...errCR };
           }
-        }
+        });
+        const docs = [
+          titular.document_number,
+          ...representados.map((r) => r.datos.document_number),
+        ].map((d) =>
+          String(d || "")
+            .trim()
+            .toUpperCase(),
+        );
+        representados.forEach((r, n) => {
+          const d = docs[n + 1];
+          if (d && docs.indexOf(d) !== n + 1)
+            e[`r${n}_document_number`] =
+              "Este documento ya está en el formulario.";
+        });
       }
     }
     if (!aceptaPrivacidad)
@@ -3762,8 +4158,6 @@ const FormularioRegistro = ({
       } else {
         const titularPrep = prepararPersona(titular, titular.es_pep);
         let conyuguePrep = null;
-        let representadoPrep = null;
-        let conyugueRepresentadoPrep = null;
 
         if (
           (calidadParticipacion === "propios_derechos" ||
@@ -3771,50 +4165,63 @@ const FormularioRegistro = ({
           esCasadoTitular &&
           titularConyugueComparece
         ) {
-          if (
-            !(
-              calidadParticipacion === "propios_y_representando" &&
-              representadoEsConyugue
-            )
-          ) {
+          if (!representaConyuge) {
             conyuguePrep = {
               ...prepararPersona(conyugue, conyugue.es_pep),
               marital_status: "casado",
               partner_document_number: titular.document_number,
             };
+            if (compartePatrimonio)
+              conyuguePrep.patrimonio = patrimonioCompartido(
+                titular.patrimonio,
+              );
             titularPrep.partner_document_number = conyugue.document_number;
           }
         }
 
+        let representadosPrep = [];
         if (
           calidadParticipacion === "representando" ||
           calidadParticipacion === "propios_y_representando"
         ) {
-          if (
-            calidadParticipacion === "propios_y_representando" &&
-            representadoEsConyugue
-          ) {
-            // El representado es el cónyuge del titular
-            conyuguePrep = prepararPersona(conyugue, conyugue.es_pep);
+          if (representaConyuge) {
+            // El cónyuge del titular es uno de los representados
+            conyuguePrep = {
+              ...prepararPersona(conyugue, conyugue.es_pep),
+              marital_status: "casado",
+              partner_document_number: titular.document_number,
+            };
+            if (compartePatrimonio)
+              conyuguePrep.patrimonio = patrimonioCompartido(
+                titular.patrimonio,
+              );
             titularPrep.partner_document_number = conyugue.document_number;
-          } else {
-            representadoPrep = prepararPersona(
-              representado,
-              representado.es_pep,
-            );
-            if (esCasadoRepresentado && representadoConyugueComparece) {
-              conyugueRepresentadoPrep = {
-                ...prepararPersona(
-                  conyugueRepresentado,
-                  conyugueRepresentado.es_pep,
-                ),
-                marital_status: "casado",
-                partner_document_number: representado.document_number,
-              };
-              representadoPrep.partner_document_number =
-                conyugueRepresentado.document_number;
-            }
           }
+          representadosPrep = representados.map((r) => {
+            const representadoPrep = prepararPersona(r.datos, r.datos.es_pep);
+            let conyugueRepresentadoPrep = null;
+            if (
+              r.datos.marital_status === "casado" &&
+              r.datos.conyugue_comparece !== false
+            ) {
+              const conyugeR = conyugeDelRepresentado(r);
+              conyugueRepresentadoPrep = {
+                ...prepararPersona(conyugeR, conyugeR.es_pep),
+                marital_status: "casado",
+                partner_document_number: r.datos.document_number,
+              };
+              if (r.compartePatrimonio)
+                conyugueRepresentadoPrep.patrimonio = patrimonioCompartido(
+                  r.datos.patrimonio,
+                );
+              representadoPrep.partner_document_number =
+                conyugeR.document_number;
+            }
+            return {
+              representado: representadoPrep,
+              conyugue_representado: conyugueRepresentadoPrep,
+            };
+          });
         }
 
         payload = {
@@ -3822,12 +4229,11 @@ const FormularioRegistro = ({
           calidad_participacion: calidadParticipacion,
           representado_es_conyugue:
             calidadParticipacion === "propios_y_representando"
-              ? representadoEsConyugue
+              ? representaConyuge
               : null,
           titular: titularPrep,
           conyugue: conyuguePrep,
-          representado: representadoPrep,
-          conyugue_representado: conyugueRepresentadoPrep,
+          representados: representadosPrep,
           acepta_condiciones: aceptaCondiciones,
           acepta_privacidad: aceptaPrivacidad,
         };
@@ -4088,10 +4494,7 @@ const FormularioRegistro = ({
                 calidadParticipacion !== "representando" &&
                 esCasadoTitular &&
                 titularConyugueComparece &&
-                !(
-                  calidadParticipacion === "propios_y_representando" &&
-                  representadoEsConyugue
-                ) && (
+                !representaConyuge && (
                   <div className="border-2 border-blue-200 rounded-xl overflow-hidden">
                     <div className="bg-blue-50 px-6 py-3 border-b border-blue-200">
                       <p className="text-sm font-medium text-blue-800">
@@ -4105,127 +4508,198 @@ const FormularioRegistro = ({
                       datos={conyugue}
                       patrimonioDe="CÓNYUGE DEL DECLARANTE"
                       onChange={handleConyugueChange}
-                      errors={Object.fromEntries(
-                        Object.entries(errors)
-                          .filter(([k]) => k.startsWith("c_"))
-                          .map(([k, v]) => [k.replace("c_", ""), v]),
-                      )}
+                      errors={erroresDe(errors, "c_")}
+                      prefijoErrores="c_"
                       mostrarEstadoCivil={false}
                       mostrarRolTramite={false}
                       mismaDir={mismaDir}
                       onToggleMismaDir={() => setMismaDir((prev) => !prev)}
+                      compartePatrimonio={compartePatrimonio}
+                      onToggleComparte={() =>
+                        setCompartePatrimonio((prev) => !prev)
+                      }
+                      conyugeDe={nombreDe(titular)}
                     />
                   </div>
                 )}
 
-              {/* ¿EL REPRESENTADO ES SU CÓNYUGE? — solo para propios_y_representando */}
-              {calidadParticipacion === "propios_y_representando" && (
-                <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-                  <label className="requerido block text-sm font-medium text-gray-700">
-                    ¿El representado es su cónyuge?
-                  </label>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setRepresentadoEsConyugue(true)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${representadoEsConyugue === true ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              {/* ¿UNO DE SUS REPRESENTADOS ES SU CÓNYUGE? — propios_y_representando y casado */}
+              {calidadParticipacion === "propios_y_representando" &&
+                esCasadoTitular && (
+                  <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
+                    <label className="requerido block text-sm font-medium text-gray-700">
+                      ¿Uno de sus representados es su cónyuge?
+                    </label>
+                    <div
+                      className="flex gap-3"
+                      data-campo="representadoEsConyugue"
                     >
-                      Sí
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRepresentadoEsConyugue(false)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${representadoEsConyugue === false ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                    >
-                      No
-                    </button>
-                  </div>
-                  {errors.representadoEsConyugue && (
-                    <p className="text-red-500 text-xs">
-                      {errors.representadoEsConyugue}
-                    </p>
-                  )}
-
-                  {/* Si es su cónyuge — formulario del cónyuge con rol en trámite */}
-                  {representadoEsConyugue === true && (
-                    <div className="border-2 border-purple-200 rounded-xl overflow-hidden mt-4">
-                      <FormularioPersona
-                        titulo="Datos del Poderdante, Mandante, Representado (cónyuge)"
-                        datos={conyugue}
-                        patrimonioDe="REPRESENTADO"
-                        onChange={handleConyugueChange}
-                        errors={Object.fromEntries(
-                          Object.entries(errors)
-                            .filter(([k]) => k.startsWith("c_"))
-                            .map(([k, v]) => [k.replace("c_", ""), v]),
-                        )}
-                        mostrarEstadoCivil={false}
-                        mostrarRolTramite={true}
-                        esRepresentado={true}
-                        mismaDir={mismaDir}
-                        onToggleMismaDir={() => setMismaDir((prev) => !prev)}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRepresentadoEsConyugue(true);
+                          // El primer representado vacío ya no hace falta
+                          setRepresentados((prev) =>
+                            prev.length === 1 && representadoVacio(prev[0])
+                              ? []
+                              : prev,
+                          );
+                        }}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${representadoEsConyugue === true ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      >
+                        Sí
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRepresentadoEsConyugue(false);
+                          setRepresentados((prev) =>
+                            prev.length ? prev : [representadoInicial()],
+                          );
+                        }}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium ${representadoEsConyugue === false ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      >
+                        No
+                      </button>
                     </div>
-                  )}
-                </div>
-              )}
+                    {errors.representadoEsConyugue && (
+                      <p className="text-red-500 text-xs">
+                        {errors.representadoEsConyugue}
+                      </p>
+                    )}
 
-              {/* FORMULARIO DEL REPRESENTADO — cuando no es el cónyuge */}
+                    {/* El cónyuge como representado: su formulario con rol en el trámite */}
+                    {representaConyuge && (
+                      <div className="border-2 border-purple-200 rounded-xl overflow-hidden mt-4">
+                        <FormularioPersona
+                          titulo="Datos del Poderdante, Mandante, Representado (cónyuge)"
+                          datos={conyugue}
+                          patrimonioDe="REPRESENTADO"
+                          onChange={handleConyugueChange}
+                          errors={erroresDe(errors, "c_")}
+                          prefijoErrores="c_"
+                          mostrarEstadoCivil={false}
+                          mostrarRolTramite={true}
+                          esRepresentado={true}
+                          mismaDir={mismaDir}
+                          onToggleMismaDir={() => setMismaDir((prev) => !prev)}
+                          compartePatrimonio={compartePatrimonio}
+                          onToggleComparte={() =>
+                            setCompartePatrimonio((prev) => !prev)
+                          }
+                          conyugeDe={nombreDe(titular)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {/* REPRESENTADOS (uno o varios) */}
               {(calidadParticipacion === "representando" ||
                 (calidadParticipacion === "propios_y_representando" &&
-                  representadoEsConyugue === false)) && (
-                <div className="border-2 border-purple-200 rounded-xl overflow-hidden">
-                  <FormularioPersona
-                    titulo="Datos del Poderdante, Mandante, Representado"
-                    datos={representado}
-                    patrimonioDe="REPRESENTADO"
-                    onChange={handleRepresentadoChange}
-                    errors={Object.fromEntries(
-                      Object.entries(errors)
-                        .filter(([k]) => k.startsWith("r_"))
-                        .map(([k, v]) => [k.replace("r_", ""), v]),
-                    )}
-                    mostrarEstadoCivil={true}
-                    mostrarRolTramite={true}
-                    esRepresentado={true}
-                  />
-
-                  {/* Cónyuge no comparece — representado */}
-                  {esCasadoRepresentado && (
-                    <div className="px-6 pb-4">
-                      <SeccionConyugue
-                        datos={representado}
-                        onChange={handleRepresentadoChange}
-                        errors={Object.fromEntries(
-                          Object.entries(errors)
-                            .filter(([k]) => k.startsWith("r_"))
-                            .map(([k, v]) => [k.replace("r_", ""), v]),
-                        )}
-                      />
-                    </div>
+                  (!esCasadoTitular || representadoEsConyugue !== null))) && (
+                <div className="space-y-4" data-campo="representados">
+                  {representaConyuge && (
+                    <p className="text-sm text-gray-600">
+                      Si también representa a otras personas, agréguelas aquí.
+                    </p>
                   )}
+                  {representados.map((r, i) => {
+                    const casado = r.datos.marital_status === "casado";
+                    const numero =
+                      representados.length > 1 || representaConyuge
+                        ? ` ${i + 1 + (representaConyuge ? 1 : 0)}`
+                        : "";
+                    return (
+                      <div
+                        key={r.clave}
+                        className="border-2 border-purple-200 rounded-xl overflow-hidden"
+                      >
+                        <FormularioPersona
+                          titulo={`Datos del Poderdante, Mandante, Representado${numero}`}
+                          datos={r.datos}
+                          patrimonioDe={`REPRESENTADO${numero}`}
+                          onChange={(f, v) =>
+                            cambiarRepresentado(i, "datos", f, v)
+                          }
+                          errors={erroresDe(errors, `r${i}_`)}
+                          prefijoErrores={`r${i}_`}
+                          mostrarEstadoCivil={true}
+                          mostrarRolTramite={true}
+                          esRepresentado={true}
+                          encabezado={
+                            representados.length > minimoRepresentados && (
+                              <button
+                                type="button"
+                                onClick={() => quitarRepresentado(i)}
+                                className="text-sm font-normal text-red-600 hover:underline"
+                              >
+                                Quitar
+                              </button>
+                            )
+                          }
+                        />
 
-                  {/* Cónyuge del representado */}
-                  {esCasadoRepresentado && representadoConyugueComparece && (
-                    <div className="border-t-2 border-purple-200">
-                      <FormularioPersona
-                        titulo="Datos del cónyuge del Poderdante, Mandante, Representado"
-                        datos={conyugueRepresentado}
-                        patrimonioDe="CÓNYUGE DEL REPRESENTADO"
-                        onChange={handleConyugueRepresentadoChange}
-                        errors={Object.fromEntries(
-                          Object.entries(errors)
-                            .filter(([k]) => k.startsWith("cr_"))
-                            .map(([k, v]) => [k.replace("cr_", ""), v]),
+                        {/* Cónyuge no comparece — representado */}
+                        {casado && (
+                          <div className="px-6 pb-4" data-prefijo={`r${i}_`}>
+                            <SeccionConyugue
+                              datos={r.datos}
+                              onChange={(f, v) =>
+                                cambiarRepresentado(i, "datos", f, v)
+                              }
+                              errors={erroresDe(errors, `r${i}_`)}
+                            />
+                          </div>
                         )}
-                        mostrarEstadoCivil={false}
-                        mostrarRolTramite={false}
-                        mismaDir={mismaDirRepresentado}
-                        onToggleMismaDir={() =>
-                          setMismaDirRepresentado((prev) => !prev)
-                        }
-                      />
-                    </div>
+
+                        {/* Cónyuge del representado */}
+                        {casado && r.datos.conyugue_comparece !== false && (
+                          <div className="border-t-2 border-purple-200">
+                            <FormularioPersona
+                              titulo={`Datos del cónyuge del Representado${numero}`}
+                              datos={conyugeDelRepresentado(r)}
+                              patrimonioDe={`CÓNYUGE DEL REPRESENTADO${numero}`}
+                              onChange={(f, v) =>
+                                cambiarRepresentado(i, "conyugue", f, v)
+                              }
+                              errors={erroresDe(errors, `cr${i}_`)}
+                              prefijoErrores={`cr${i}_`}
+                              mostrarEstadoCivil={false}
+                              mostrarRolTramite={false}
+                              mismaDir={r.mismaDir}
+                              onToggleMismaDir={() =>
+                                toggleMismaDirRepresentado(i)
+                              }
+                              compartePatrimonio={r.compartePatrimonio}
+                              onToggleComparte={() =>
+                                toggleComparteRepresentado(i)
+                              }
+                              conyugeDe={nombreDe(r.datos)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {errors.representados && (
+                    <p className="text-red-500 text-sm">
+                      {errors.representados}
+                    </p>
+                  )}
+                  {representados.length < MAX_REPRESENTADOS ? (
+                    <button
+                      type="button"
+                      onClick={agregarRepresentado}
+                      className="w-full px-4 py-3 border-2 border-dashed border-purple-300 text-purple-700 rounded-xl font-medium hover:bg-purple-50"
+                    >
+                      + Agregar {representados.length === 0 ? "un" : "otro"}{" "}
+                      representado
+                    </button>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center">
+                      Máximo {MAX_REPRESENTADOS} representados por formulario.
+                    </p>
                   )}
                 </div>
               )}

@@ -1,8 +1,4 @@
-/**
- * Muestra un envío del formulario de registro tal cual se llenó, en el mismo
- * orden del formulario. Se usa en la ficha de Comparecientes y en la
- * impresión para la firma (con `imprimible`: textos legales y firmas).
- */
+import { Fragment } from "react";
 import { etiquetaActividad } from "../../utils/actividadesEconomicas";
 import {
   CALIDADES_PARTICIPACION,
@@ -81,18 +77,25 @@ const Bloque = ({ titulo, children }) => (
 );
 
 // ─── Secciones del formulario ───────────────────────────────────────────────
-const Direccion = ({ d, p = "", titulo = "Dirección" }) => (
-  <Grupo titulo={titulo}>
-    <Campo etiqueta="Provincia" valor={d[`${p}province`]} />
-    <Campo etiqueta="Cantón" valor={d[`${p}canton`]} />
-    <Campo etiqueta="Parroquia" valor={d[`${p}parroquia`]} />
-    <Campo etiqueta="Sector / Urbanización" valor={d[`${p}sector`]} />
-    <Campo etiqueta="Calle Principal" valor={d[`${p}main_street`]} />
-    <Campo etiqueta="Calle Secundaria" valor={d[`${p}secondary_street`]} />
-    <Campo etiqueta="Número" valor={d[`${p}number_street`]} />
-    <Campo etiqueta="Referencia" valor={d[`${p}referencia`]} ancho />
-  </Grupo>
-);
+const Direccion = ({ d, p = "", titulo = "Dirección" }) =>
+  d[`${p}reside_extranjero`] === true ? (
+    <Grupo titulo={`${titulo} (reside en el extranjero)`}>
+      <Campo etiqueta="País" valor={d[`${p}pais_residencia`]} />
+      <Campo etiqueta="Ciudad" valor={d[`${p}ciudad_residencia`]} />
+      <Campo etiqueta="Dirección" valor={d[`${p}direccion_extranjero`]} ancho />
+    </Grupo>
+  ) : (
+    <Grupo titulo={titulo}>
+      <Campo etiqueta="Provincia" valor={d[`${p}province`]} />
+      <Campo etiqueta="Cantón" valor={d[`${p}canton`]} />
+      <Campo etiqueta="Parroquia" valor={d[`${p}parroquia`]} />
+      <Campo etiqueta="Sector / Urbanización" valor={d[`${p}sector`]} />
+      <Campo etiqueta="Calle Principal" valor={d[`${p}main_street`]} />
+      <Campo etiqueta="Calle Secundaria" valor={d[`${p}secondary_street`]} />
+      <Campo etiqueta="Número" valor={d[`${p}number_street`]} />
+      <Campo etiqueta="Referencia" valor={d[`${p}referencia`]} ancho />
+    </Grupo>
+  );
 
 const Lista = ({ titulo, filas, noPosee, render }) => (
   <div className="col-span-2">
@@ -134,6 +137,11 @@ const Patrimonio = ({ pat, quien = "DECLARANTE" }) => {
 
   return (
     <Grupo titulo={tituloPatrimonio(quien)}>
+      {pat.compartida_con_conyuge && (
+        <p className="col-span-2 text-xs text-gray-600 italic">
+          Comparte la situación patrimonial con su cónyuge.
+        </p>
+      )}
       <Lista
         titulo="Propiedades inmuebles"
         filas={pat.inmuebles}
@@ -377,14 +385,29 @@ const Empresa = ({ e }) => {
     <>
       <Bloque titulo="Datos de la Empresa">
         <Grupo>
-          <Campo etiqueta="RUC" valor={e.ruc} />
+          <Campo
+            etiqueta={
+              e.es_extranjera
+                ? "Identificación fiscal o tributaria del país de domicilio"
+                : "RUC"
+            }
+            valor={e.ruc}
+          />
           <Campo etiqueta="Razón Social" valor={e.razon_social} />
         </Grupo>
         <Grupo titulo="Contacto de la Empresa">
           <Campo etiqueta="Correo Electrónico" valor={e.email} />
           <Campo etiqueta="Teléfono" valor={e.phone} />
         </Grupo>
-        <Direccion d={e} titulo="Dirección de la Empresa" />
+        {e.es_extranjera ? (
+          <Grupo titulo="Dirección de la Empresa (domiciliada en el extranjero)">
+            <Campo etiqueta="País" valor={e.pais_domicilio} />
+            <Campo etiqueta="Ciudad" valor={e.ciudad_domicilio} />
+            <Campo etiqueta="Dirección" valor={e.direccion_extranjero} ancho />
+          </Grupo>
+        ) : (
+          <Direccion d={e} titulo="Dirección de la Empresa" />
+        )}
         <UAFE d={e} esEmpresa titulo="Información Financiera de la Empresa" />
         <Patrimonio pat={e.patrimonio} quien="EMPRESA" />
         <Grupo titulo="Socios o Accionistas">
@@ -522,6 +545,19 @@ const firmantes = (payload) => {
   return lista;
 };
 
+// Los registros anteriores traen un solo "representado"
+const representadosDe = (payload) =>
+  Array.isArray(payload.representados)
+    ? payload.representados.filter((r) => r?.representado)
+    : payload.representado
+      ? [
+          {
+            representado: payload.representado,
+            conyugue_representado: payload.conyugue_representado,
+          },
+        ]
+      : [];
+
 // ─── Componente principal ───────────────────────────────────────────────────
 const VistaRegistro = ({ registro, imprimible = false }) => {
   const payload = registro?.payload || {};
@@ -598,7 +634,7 @@ const VistaRegistro = ({ registro, imprimible = false }) => {
           )}
 
           {calidad === "propios_y_representando" && (
-            <Bloque titulo="¿El representado es su cónyuge?">
+            <Bloque titulo="¿Uno de sus representados es su cónyuge?">
               <Grupo>
                 <Campo
                   etiqueta="Respuesta"
@@ -618,25 +654,30 @@ const VistaRegistro = ({ registro, imprimible = false }) => {
             />
           )}
 
-          {payload.representado && (
-            <>
-              <Persona
-                titulo="Datos del Poderdante, Mandante, Representado"
-                d={payload.representado}
-                quien="REPRESENTADO"
-                esRepresentado
-              />
-              <ConyugeNoComparece d={payload.representado} />
-              {payload.conyugue_representado && (
+          {representadosDe(payload).map((r, i, todos) => {
+            const total = todos.length + (conyugeEsRepresentado ? 1 : 0);
+            const numero =
+              total > 1 ? ` ${i + 1 + (conyugeEsRepresentado ? 1 : 0)}` : "";
+            return (
+              <Fragment key={i}>
                 <Persona
-                  titulo="Datos del cónyuge del Poderdante, Mandante, Representado"
-                  d={payload.conyugue_representado}
-                  quien="CÓNYUGE DEL REPRESENTADO"
-                  mostrarEstadoCivil={false}
+                  titulo={`Datos del Poderdante, Mandante, Representado${numero}`}
+                  d={r.representado}
+                  quien={`REPRESENTADO${numero}`}
+                  esRepresentado
                 />
-              )}
-            </>
-          )}
+                <ConyugeNoComparece d={r.representado} />
+                {r.conyugue_representado && (
+                  <Persona
+                    titulo={`Datos del cónyuge del Representado${numero}`}
+                    d={r.conyugue_representado}
+                    quien={`CÓNYUGE DEL REPRESENTADO${numero}`}
+                    mostrarEstadoCivil={false}
+                  />
+                )}
+              </Fragment>
+            );
+          })}
         </>
       )}
 

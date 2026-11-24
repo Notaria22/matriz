@@ -23,7 +23,9 @@ class RegistrationToken(Base):
     link = Column(String(500), nullable=True)
 
     tipo_esperado = Column(enum_column_type(TipoSujeto, "tipo_esperado"), nullable=False)
-    documento_esperado = Column(String(20), nullable=False)
+    documento_esperado = Column(String(30), nullable=False)
+    # cedula o pasaporte (solo personas): el formulario se abre fijo en ese tipo
+    documento_tipo_esperado = Column(String(10), nullable=True)
     # Para que el personal sepa a quién envió cada link
     nombre_compareciente = Column(String(200), nullable=True)
 

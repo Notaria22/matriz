@@ -4,6 +4,18 @@ import { Card, Button } from "../../components/shared";
 import { useToast } from "../../hooks/useToast";
 
 const DIAS_VIGENCIA = 7;
+const ETIQUETA_DOCUMENTO = {
+  cedula: "Número de cédula",
+  pasaporte: "Número de pasaporte",
+  ruc: "RUC de la empresa",
+  extranjera: "Identificación fiscal o tributaria del país de domicilio",
+};
+const EJEMPLO_DOCUMENTO = {
+  cedula: "1712345678",
+  pasaporte: "AB123456",
+  ruc: "1790012345001",
+  extranjera: "Ej: 900.123.456-7",
+};
 const POR_PAGINA = 20;
 const PESTANAS = [
   { valor: "pendiente", etiqueta: "Pendientes" },
@@ -34,14 +46,20 @@ const GestionTokensPage = () => {
   const [errorDocumento, setErrorDocumento] = useState("");
   const [nombre, setNombre] = useState("");
   const [errorNombre, setErrorNombre] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("cedula");
 
   const validarDocumento = () => {
     const doc = documento.trim().toUpperCase();
-    if (tipo === "empresa") {
+    if (tipoDocumento === "ruc") {
       if (!/^\d{13}$/.test(doc) || !doc.endsWith("001"))
         return "El RUC debe tener 13 dígitos y terminar en 001";
-    } else if (!/^\d{10}$/.test(doc) && !/^[A-Z0-9]{6,13}$/.test(doc)) {
-      return "Ingrese una cédula de 10 dígitos o un pasaporte válido";
+    } else if (tipoDocumento === "extranjera") {
+      if (!/^[A-Z0-9][A-Z0-9.-]{1,28}[A-Z0-9]$/.test(doc))
+        return "La identificación fiscal debe tener de 3 a 30 letras, números, puntos o guiones";
+    } else if (tipoDocumento === "cedula" && !/^\d{10}$/.test(doc)) {
+      return "La cédula debe tener 10 dígitos";
+    } else if (tipoDocumento === "pasaporte" && !/^[A-Z0-9]{6,13}$/.test(doc)) {
+      return "El pasaporte debe tener entre 6 y 13 letras o números, sin espacios ni guiones";
     }
     return "";
   };
@@ -107,6 +125,10 @@ const GestionTokensPage = () => {
         tipo === "empresa"
           ? data.razon_social
           : [data.names, data.last_names].filter(Boolean).join(" ");
+      if (tipo === "persona" && data.document_type)
+        setTipoDocumento(data.document_type);
+      if (tipo === "empresa")
+        setTipoDocumento(data.es_extranjera ? "extranjera" : "ruc");
       if (encontrado) {
         setNombre((actual) => actual || encontrado.toUpperCase());
         setErrorNombre("");
@@ -133,6 +155,7 @@ const GestionTokensPage = () => {
           tipo,
           documento: documento.trim().toUpperCase(),
           nombre: nombre.trim(),
+          tipo_documento: tipoDocumento,
         }),
       });
       if (res.ok) {
@@ -260,6 +283,9 @@ const GestionTokensPage = () => {
                 value={tipo}
                 onChange={(e) => {
                   setTipo(e.target.value);
+                  setTipoDocumento(
+                    e.target.value === "empresa" ? "ruc" : "cedula",
+                  );
                   setErrorDocumento("");
                   setNombre("");
                   setErrorNombre("");
@@ -270,11 +296,38 @@ const GestionTokensPage = () => {
                 <option value="empresa">Empresa (persona jurídica)</option>
               </select>
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {tipo === "empresa"
-                  ? "RUC de la empresa"
-                  : "Cédula o pasaporte de quien llenará el formulario"}
+                  ? "Domicilio de la empresa"
+                  : "Tipo de documento"}
+              </label>
+              <select
+                value={tipoDocumento}
+                onChange={(e) => {
+                  setTipoDocumento(e.target.value);
+                  setErrorDocumento("");
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {tipo === "empresa" ? (
+                  <>
+                    <option value="ruc">Ecuatoriana (RUC)</option>
+                    <option value="extranjera">
+                      Extranjera (identificación fiscal)
+                    </option>
+                  </>
+                ) : (
+                  <>
+                    <option value="cedula">Cédula</option>
+                    <option value="pasaporte">Pasaporte</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {ETIQUETA_DOCUMENTO[tipoDocumento]}
               </label>
               <input
                 type="text"
@@ -284,10 +337,8 @@ const GestionTokensPage = () => {
                   setErrorDocumento("");
                 }}
                 onBlur={buscarNombre}
-                maxLength={13}
-                placeholder={
-                  tipo === "empresa" ? "1790012345001" : "1712345678"
-                }
+                maxLength={tipoDocumento === "extranjera" ? 30 : 13}
+                placeholder={EJEMPLO_DOCUMENTO[tipoDocumento]}
                 className={`w-full px-3 py-2 border rounded-lg text-sm ${
                   errorDocumento
                     ? "border-red-400 bg-red-50"
@@ -459,7 +510,13 @@ const GestionTokensPage = () => {
                             </div>
                           )}
                           <span className="text-xs text-gray-500 mr-1">
-                            {tkn.tipo_esperado === "empresa" ? "RUC" : "Doc."}
+                            {tkn.tipo_esperado === "empresa"
+                              ? tkn.documento_tipo_esperado === "extranjera"
+                                ? "Id. fiscal"
+                                : "RUC"
+                              : tkn.documento_tipo_esperado === "pasaporte"
+                                ? "Pasaporte"
+                                : "Cédula"}
                           </span>
                           {tkn.documento_esperado || "-"}
                         </td>

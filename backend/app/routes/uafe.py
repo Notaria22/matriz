@@ -54,26 +54,21 @@ def consultar_uafe(
     """
     Consulta datos UAFE de una persona natural o empresa por cédula o RUC.
 
-    - 10 dígitos → persona natural
-    - 13 dígitos → empresa
+    Busca primero una persona (cédula o pasaporte) y luego una empresa (RUC o
+    identificación fiscal extranjera).
 
     El bloque "uafe" corresponde a la declaración más reciente; el historial
     completo va en "historial_declaraciones" (de la más reciente a la más antigua).
 
     Requiere header: X-API-Key
     """
-    documento = documento.strip()
+    documento = documento.strip().upper()
+    if not documento:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Indique el número de documento.")
 
-    if not documento.isdigit():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El documento debe contener solo dígitos.")
-
-    if len(documento) == 10:
-        party = svc.buscar_party(db, documento)
-        if not party:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No se encontró ninguna persona con cédula {documento}.",
-            )
+    party = svc.buscar_party(db, documento)
+    company = None if party else svc.buscar_company(db, documento)
+    if party:
 
         partner = party.partner
         conyugue = None
@@ -101,6 +96,10 @@ def consultar_uafe(
             "fecha_nacimiento": str(party.birth_date) if party.birth_date else None,
             "email": party.email,
             "telefono": party.phone,
+            "reside_extranjero": bool(party.reside_extranjero),
+            "pais_residencia": party.pais_residencia,
+            "ciudad_residencia": party.ciudad_residencia,
+            "direccion_extranjero": party.direccion_extranjero,
             "provincia": party.province,
             "canton": party.canton,
             "parroquia": party.parroquia,
@@ -116,13 +115,7 @@ def consultar_uafe(
             "historial_declaraciones": [svc.serializar_declaracion(d) for d in party.declaraciones],
         }
 
-    elif len(documento) == 13:
-        company = svc.buscar_company(db, documento)
-        if not company:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No se encontró ninguna empresa con RUC {documento}.",
-            )
+    elif company:
 
         decl = svc.ultima_declaracion(company)
         d = svc.serializar_declaracion(decl) if decl else {}
@@ -132,6 +125,10 @@ def consultar_uafe(
         return {
             "tipo": "persona_juridica",
             "ruc": company.ruc,
+            "tipo_identificacion": "extranjera" if company.es_extranjera else "ruc",
+            "pais_domicilio": company.pais_domicilio if company.es_extranjera else "Ecuador",
+            "ciudad_domicilio": company.ciudad_domicilio,
+            "direccion_extranjero": company.direccion_extranjero,
             "razon_social": company.razon_social,
             "email": company.email,
             "telefono": company.phone,
@@ -173,6 +170,10 @@ def consultar_uafe(
                 "profesion": rep.profession,
                 "email": rep.email,
                 "telefono": rep.phone,
+                "reside_extranjero": bool(rep.reside_extranjero),
+                "pais_residencia": rep.pais_residencia,
+                "ciudad_residencia": rep.ciudad_residencia,
+                "direccion_extranjero": rep.direccion_extranjero,
                 "provincia": rep.province,
                 "canton": rep.canton,
                 "parroquia": rep.parroquia,
@@ -186,6 +187,6 @@ def consultar_uafe(
 
     else:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El documento debe tener 10 dígitos (cédula) o 13 dígitos (RUC).",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró ninguna persona ni empresa con el documento {documento}.",
         )

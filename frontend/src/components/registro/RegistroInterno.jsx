@@ -1,11 +1,3 @@
-/**
- * El mismo formulario del cliente, llenado por el personal de la notaría.
- *
- *  - modo "nuevo": primero se pide el documento; si ya está registrado se
- *    bloquea ("use Actualizar").
- *  - modo "actualizar": se precarga la identidad actual y la parte UAFE va
- *    vacía; al guardar se crea una declaración nueva.
- */
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import FormularioRegistro from "./FormularioRegistro";
@@ -30,6 +22,15 @@ const RegistroInterno = ({
 }) => {
   const esEmpresa = tipo === "empresa";
   const [documento, setDocumento] = useState(documentoInicial);
+  const [tipoDocumento, setTipoDocumento] = useState(() => {
+    if (esEmpresa)
+      return !documentoInicial || /^\d{13}$/.test(documentoInicial)
+        ? "ruc"
+        : "extranjera";
+    return !documentoInicial || /^\d{10}$/.test(documentoInicial)
+      ? "cedula"
+      : "pasaporte";
+  });
   const [paso, setPaso] = useState(
     modo === "actualizar" || documentoInicial ? "cargando" : "documento",
   );
@@ -141,7 +142,42 @@ const RegistroInterno = ({
         </h2>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            {esEmpresa ? "RUC" : "Cédula o pasaporte"}
+            {esEmpresa ? "Domicilio de la empresa" : "Tipo de documento"}
+          </label>
+          <select
+            value={tipoDocumento}
+            onChange={(e) => {
+              setTipoDocumento(e.target.value);
+              setError("");
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            {esEmpresa ? (
+              <>
+                <option value="ruc">Ecuatoriana (RUC)</option>
+                <option value="extranjera">
+                  Extranjera (identificación fiscal)
+                </option>
+              </>
+            ) : (
+              <>
+                <option value="cedula">Cédula</option>
+                <option value="pasaporte">Pasaporte</option>
+              </>
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {
+              {
+                ruc: "RUC",
+                extranjera:
+                  "Identificación fiscal o tributaria del país de domicilio",
+                cedula: "Número de cédula",
+                pasaporte: "Número de pasaporte",
+              }[tipoDocumento]
+            }
           </label>
           <input
             type="text"
@@ -152,8 +188,15 @@ const RegistroInterno = ({
               setYaExiste(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && comprobar(documento)}
-            maxLength={esEmpresa ? 13 : 13}
-            placeholder={esEmpresa ? "0000000000001" : "0000000000"}
+            maxLength={tipoDocumento === "extranjera" ? 30 : 13}
+            placeholder={
+              {
+                ruc: "0000000000001",
+                extranjera: "Ej: 900.123.456-7",
+                cedula: "0000000000",
+                pasaporte: "AB123456",
+              }[tipoDocumento]
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
@@ -202,6 +245,7 @@ const RegistroInterno = ({
       key={`${modo}-${documento}`}
       tipo={tipo}
       documento={documento}
+      tipoDocumento={modo === "nuevo" ? tipoDocumento : null}
       documentoFijo
       datosIniciales={datosIniciales}
       encabezado={false}

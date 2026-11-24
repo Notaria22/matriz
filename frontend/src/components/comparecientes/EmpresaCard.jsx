@@ -168,7 +168,7 @@ const EmpresaCard = ({ data }) => {
         <h3 className="text-xl font-bold text-gray-900">{data.razonSocial}</h3>
         <div className="flex flex-wrap gap-2">
           <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded">
-            RUC: {data.ruc}
+            {data.esExtranjera ? "Id. fiscal" : "RUC"}: {data.ruc}
           </span>
           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
             Empresa
@@ -183,15 +183,33 @@ const EmpresaCard = ({ data }) => {
           <InfoRow icon={Phone} label="Teléfono" value={data.phone} />
         </div>
         <div className="space-y-1">
-          <InfoRow
-            icon={MapPin}
-            label="Dirección"
-            value={getAddress("", data)}
-          />
-          <InfoRow icon={MapPin} label="Sector" value={data.sector} />
-          <InfoRow icon={MapPin} label="Parroquia" value={data.parroquia} />
-          <InfoRow icon={MapPin} label="Cantón" value={data.canton} />
-          <InfoRow icon={MapPin} label="Provincia" value={data.province} />
+          {data.esExtranjera ? (
+            <>
+              <InfoRow
+                icon={MapPin}
+                label="Dirección (extranjero)"
+                value={data.direccionExtranjero}
+              />
+              <InfoRow
+                icon={MapPin}
+                label="Ciudad"
+                value={data.ciudadDomicilio}
+              />
+              <InfoRow icon={MapPin} label="País" value={data.paisDomicilio} />
+            </>
+          ) : (
+            <>
+              <InfoRow
+                icon={MapPin}
+                label="Dirección"
+                value={getAddress("", data)}
+              />
+              <InfoRow icon={MapPin} label="Sector" value={data.sector} />
+              <InfoRow icon={MapPin} label="Parroquia" value={data.parroquia} />
+              <InfoRow icon={MapPin} label="Cantón" value={data.canton} />
+              <InfoRow icon={MapPin} label="Provincia" value={data.province} />
+            </>
+          )}
         </div>
       </div>
 
@@ -378,19 +396,45 @@ const EmpresaCard = ({ data }) => {
             <InfoRow icon={Phone} label="Teléfono" value={data.repPhone} />
           </div>
           <div className="space-y-1">
-            <InfoRow
-              icon={MapPin}
-              label="Dirección"
-              value={getAddress("rep", data)}
-            />
-            <InfoRow icon={MapPin} label="Sector" value={data.repSector} />
-            <InfoRow
-              icon={MapPin}
-              label="Parroquia"
-              value={data.repParroquia}
-            />
-            <InfoRow icon={MapPin} label="Cantón" value={data.repCanton} />
-            <InfoRow icon={MapPin} label="Provincia" value={data.repProvince} />
+            {data.repResideExtranjero ? (
+              <>
+                <InfoRow
+                  icon={MapPin}
+                  label="Dirección (extranjero)"
+                  value={data.repDireccionExtranjero}
+                />
+                <InfoRow
+                  icon={MapPin}
+                  label="Ciudad"
+                  value={data.repCiudadResidencia}
+                />
+                <InfoRow
+                  icon={MapPin}
+                  label="País"
+                  value={data.repPaisResidencia}
+                />
+              </>
+            ) : (
+              <>
+                <InfoRow
+                  icon={MapPin}
+                  label="Dirección"
+                  value={getAddress("rep", data)}
+                />
+                <InfoRow icon={MapPin} label="Sector" value={data.repSector} />
+                <InfoRow
+                  icon={MapPin}
+                  label="Parroquia"
+                  value={data.repParroquia}
+                />
+                <InfoRow icon={MapPin} label="Cantón" value={data.repCanton} />
+                <InfoRow
+                  icon={MapPin}
+                  label="Provincia"
+                  value={data.repProvince}
+                />
+              </>
+            )}
           </div>
         </div>
 

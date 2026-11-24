@@ -100,23 +100,39 @@ const ComparecienteCard = ({ data, showPartner = false }) => {
           )}
         </div>
 
-        <div className="space-y-1">
-          <InfoRow
-            icon={Home}
-            label="Domicilio"
-            value={getStreetAddress(data)}
-          />
+        {data.resideExtranjero ? (
+          <div className="space-y-1">
+            <InfoRow
+              icon={Home}
+              label="Domicilio (extranjero)"
+              value={data.direccionExtranjero}
+            />
+            <InfoRow
+              icon={MapPin}
+              label="Ciudad"
+              value={data.ciudadResidencia}
+            />
+            <InfoRow icon={MapPin} label="País" value={data.paisResidencia} />
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <InfoRow
+              icon={Home}
+              label="Domicilio"
+              value={getStreetAddress(data)}
+            />
 
-          {data.sector && (
-            <InfoRow icon={MapPin} label="Sector" value={data.sector} />
-          )}
+            {data.sector && (
+              <InfoRow icon={MapPin} label="Sector" value={data.sector} />
+            )}
 
-          <InfoRow icon={MapPin} label="Parroquia" value={data.parroquia} />
+            <InfoRow icon={MapPin} label="Parroquia" value={data.parroquia} />
 
-          <InfoRow icon={MapPin} label="Cantón" value={data.canton} />
+            <InfoRow icon={MapPin} label="Cantón" value={data.canton} />
 
-          <InfoRow icon={MapPin} label="Provincia" value={data.province} />
-        </div>
+            <InfoRow icon={MapPin} label="Provincia" value={data.province} />
+          </div>
+        )}
       </div>
 
       {/* Datos del cónyuge */}

@@ -5,7 +5,7 @@ Aquí solo van los datos que identifican a la persona y que usan las minutas y
 matrices. Lo que declara para la UAFE va en `declaraciones_uafe`, una fila por
 cada declaración, para no perder el historial.
 """
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, false as sa_false
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -47,15 +47,19 @@ class Party(Base):
 
     # Contacto
     email = Column(String(100), nullable=False)
-    phone = Column(String(15), nullable=False)
+    phone = Column(String(20), nullable=False)
 
-    # Dirección
-    province = Column(String(50), nullable=False)
-    canton = Column(String(50), nullable=False)
+    # Dirección: en Ecuador (provincia, cantón, calles) o en el extranjero
+    reside_extranjero = Column(Boolean, nullable=False, default=False, server_default=sa_false())
+    pais_residencia = Column(String(80), nullable=True)
+    ciudad_residencia = Column(String(100), nullable=True)
+    direccion_extranjero = Column(String(300), nullable=True)
+    province = Column(String(50), nullable=True)
+    canton = Column(String(50), nullable=True)
     parroquia = Column(String(50), nullable=True)
     sector = Column(String(100), nullable=True)
-    main_street = Column(String(150), nullable=False)
-    secondary_street = Column(String(150), nullable=False)
+    main_street = Column(String(150), nullable=True)
+    secondary_street = Column(String(150), nullable=True)
     number_street = Column(String(20), nullable=True)
     referencia = Column(String(200), nullable=True)  # "atrás de SOLCA", etc.
     edificio = Column(String(200), nullable=True)

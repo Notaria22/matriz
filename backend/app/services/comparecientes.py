@@ -34,6 +34,7 @@ from app.models.party import Party
 PARTY_IDENTIDAD = [
     "document_type", "document_number", "names", "last_names", "gender",
     "marital_status", "nationality", "birth_date", "email", "phone",
+    "reside_extranjero", "pais_residencia", "ciudad_residencia", "direccion_extranjero",
     "province", "canton", "parroquia", "sector", "main_street",
     "secondary_street", "number_street", "referencia", "edificio", "occupation", "profession",
 ]
@@ -47,7 +48,8 @@ UAFE_PERSONA = [
 ]
 
 COMPANY_IDENTIDAD = [
-    "ruc", "razon_social", "email", "phone", "province", "canton", "parroquia",
+    "ruc", "es_extranjera", "pais_domicilio", "ciudad_domicilio", "direccion_extranjero",
+    "razon_social", "email", "phone", "province", "canton", "parroquia",
     "sector", "main_street", "secondary_street", "number_street", "referencia",
 ]
 
@@ -372,7 +374,7 @@ def serializar_party(party: Party, con_partner: bool = True) -> dict:
 def buscar_company(db: Session, ruc: Optional[str]) -> Optional[Company]:
     if not ruc:
         return None
-    return db.query(Company).filter(Company.ruc == ruc.strip()).first()
+    return db.query(Company).filter(Company.ruc == ruc.strip().upper()).first()
 
 
 def datos_rep(datos: dict) -> dict:

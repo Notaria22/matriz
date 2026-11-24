@@ -22,7 +22,12 @@ const RegistroClientePage = () => {
         const data = await res.json();
         setTokenInfo(
           data.valido && data.tipo && data.documento
-            ? { valido: true, tipo: data.tipo, documento: data.documento }
+            ? {
+                valido: true,
+                tipo: data.tipo,
+                documento: data.documento,
+                tipo_documento: data.tipo_documento,
+              }
             : { valido: false },
         );
       } catch {
@@ -122,6 +127,7 @@ const RegistroClientePage = () => {
       <FormularioRegistro
         tipo={tokenInfo.tipo}
         documento={tokenInfo.documento}
+        tipoDocumento={tokenInfo.tipo_documento}
         documentoFijo
         onEnviar={enviar}
       />

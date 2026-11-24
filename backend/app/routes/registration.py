@@ -64,6 +64,7 @@ def generar_token(
         link=link,
         tipo_esperado=TipoSujeto(datos.tipo),
         documento_esperado=datos.documento,
+        documento_tipo_esperado=datos.tipo_documento,
         nombre_compareciente=datos.nombre,
         expira_en=expira_en,
         creado_en=ahora,
@@ -80,6 +81,7 @@ def generar_token(
         tipo=datos.tipo,
         documento=datos.documento,
         nombre=datos.nombre,
+        tipo_documento=datos.tipo_documento,
     )
 
 
@@ -133,6 +135,7 @@ def listar_tokens(
             usado_en=t.usado_en,
             tipo_esperado=t.tipo_esperado.value,
             documento_esperado=t.documento_esperado,
+            documento_tipo_esperado=t.documento_tipo_esperado,
             nombre_compareciente=t.nombre_compareciente,
             creado_en=t.creado_en,
             expira_en=t.expira_en,
@@ -190,6 +193,7 @@ def verificar_token(token: str, db: Session = Depends(get_db)):
         mensaje="Token válido",
         tipo=token_obj.tipo_esperado.value,
         documento=token_obj.documento_esperado,
+        tipo_documento=token_obj.documento_tipo_esperado,
     )
 # ============================================
 # LÓGICA COMPARTIDA: formulario público e interno
@@ -213,12 +217,35 @@ def _sin_campos_ausentes(datos: dict, raw: dict, campos) -> dict:
 
 # ---- Errores de validación claros, en español y por campo ----
 
-_PERSONAS_FORMULARIO = [
-    ("titular", "", "Sus datos"),
-    ("conyugue", "c_", "Datos del cónyuge"),
-    ("representado", "r_", "Datos del representado"),
-    ("conyugue_representado", "cr_", "Datos del cónyuge del representado"),
-]
+MAX_REPRESENTADOS = 20
+
+
+def _representados(payload: dict) -> list[dict]:
+    """
+    Lista de representados: [{"representado": {...}, "conyugue_representado": {...} | None}].
+    Los envíos anteriores traían un solo "representado".
+    """
+    lista = payload.get("representados")
+    if isinstance(lista, list):
+        return [r for r in lista if isinstance(r, dict) and r.get("representado")]
+    if payload.get("representado"):
+        return [{
+            "representado": payload["representado"],
+            "conyugue_representado": payload.get("conyugue_representado"),
+        }]
+    return []
+
+
+def _personas_formulario(payload: dict) -> list[tuple[dict, str, str]]:
+    """(datos, prefijo de los errores, sección) de cada persona del formulario."""
+    personas = [
+        (payload.get("titular"), "", "Sus datos"),
+        (payload.get("conyugue"), "c_", "Datos del cónyuge"),
+    ]
+    for i, r in enumerate(_representados(payload)):
+        personas.append((r.get("representado"), f"r{i}_", f"Representado {i + 1}"))
+        personas.append((r.get("conyugue_representado"), f"cr{i}_", f"Cónyuge del representado {i + 1}"))
+    return [(raw, prefijo, seccion) for raw, prefijo, seccion in personas if raw]
 
 
 def _mensaje_es(err: dict) -> str:
@@ -257,6 +284,13 @@ def _errores_de(e: ValidationError, prefijo: str, seccion: str) -> list[dict]:
     for err in e.errors():
         loc = [str(x) for x in err.get("loc", []) if not isinstance(x, int)]
         campo = loc[0] if loc else ""
+        crudo = str(err.get("msg", "")).replace("Value error, ", "")
+        # Errores de todo el modelo con su campo: "campo::mensaje||campo::mensaje"
+        if not campo and "::" in crudo:
+            for parte in crudo.split("||"):
+                c, _, m = parte.partition("::")
+                errores.append({"campo": f"{prefijo}{c}", "seccion": seccion, "mensaje": m})
+            continue
         mensaje = _mensaje_es(err)
         # Errores de todo el modelo (sin campo): ubicarlos en el campo que corresponde
         if not campo and "forma en la que participa" in mensaje.lower():
@@ -317,6 +351,33 @@ def _errores_patrimonio(pat, prefijo: str, seccion: str, obligatoria: bool) -> l
     return errores
 
 
+def _errores_representados(payload: dict) -> list[dict]:
+    calidad = payload.get("calidad_participacion") or "propios_derechos"
+    representados = _representados(payload)
+    if calidad not in ("representando", "propios_y_representando"):
+        return []
+
+    def error(mensaje, campo=""):
+        return {"campo": campo, "seccion": "Representados", "mensaje": mensaje}
+
+    es_conyuge = calidad == "propios_y_representando" and payload.get("representado_es_conyugue")
+    if not representados and not es_conyuge:
+        return [error("Agregue los datos de al menos un representado.")]
+    if len(representados) > MAX_REPRESENTADOS:
+        return [error(f"Puede registrar hasta {MAX_REPRESENTADOS} representados en un formulario.")]
+
+    errores = []
+    vistos = {str((payload.get("titular") or {}).get("document_number") or "").strip().upper()}
+    if es_conyuge:
+        vistos.add(str((payload.get("conyugue") or {}).get("document_number") or "").strip().upper())
+    for i, r in enumerate(representados):
+        doc = str(r["representado"].get("document_number") or "").strip().upper()
+        if doc and doc in vistos:
+            errores.append(error("Este documento ya está en el formulario.", f"r{i}_document_number"))
+        vistos.add(doc)
+    return errores
+
+
 def _validar_envio(payload: dict, tipo: str) -> None:
     """Valida TODO el formulario antes de guardar y devuelve todos los errores juntos."""
     errores = []
@@ -333,10 +394,8 @@ def _validar_envio(payload: dict, tipo: str) -> None:
         errores.extend(_errores_patrimonio(raw.get("patrimonio"), "", "Empresa", True))
         errores.extend(_errores_patrimonio(raw.get("rep_patrimonio"), "rep_", "Representante legal", True))
     else:
-        for clave, prefijo, seccion in _PERSONAS_FORMULARIO:
-            raw = payload.get(clave)
-            if not raw:
-                continue
+        errores.extend(_errores_representados(payload))
+        for raw, prefijo, seccion in _personas_formulario(payload):
             try:
                 PartyCreate(**raw)
             except ValidationError as e:
@@ -561,21 +620,22 @@ def _registrar_personas(db: Session, payload: dict, ctx: _Contexto, documento_es
     elif ctx.interno and titular.marital_status is not None and titular.marital_status.value != "casado":
         svc.vincular_conyuges(db, titular, None)
 
-    representado = None
-    if payload.get("representado"):
-        representado, representado_nuevo = _registrar_persona(db, dict(payload["representado"]), ctx, extra)
-        if payload.get("conyugue_representado"):
-            cr, cr_nuevo = _registrar_persona(db, dict(payload["conyugue_representado"]), ctx)
+    representados = []
+    for r in _representados(payload):
+        representado, representado_nuevo = _registrar_persona(db, dict(r["representado"]), ctx, extra)
+        if r.get("conyugue_representado"):
+            cr, cr_nuevo = _registrar_persona(db, dict(r["conyugue_representado"]), ctx)
             _enlazar_conyuges(db, ctx, representado, representado_nuevo, cr, cr_nuevo)
+        representados.append((representado, False))
 
     if calidad in ("representando", "propios_y_representando"):
-        if calidad == "propios_y_representando" and representado_es_conyugue:
-            representado = conyuge
-        if representado is not None:
+        if calidad == "propios_y_representando" and representado_es_conyugue and conyuge is not None:
+            representados.insert(0, (conyuge, True))
+        for representado, es_conyugue in representados:
             db.add(Representacion(
                 representante_id=titular.id,
                 representado_id=representado.id,
-                es_conyugue=representado_es_conyugue if calidad == "propios_y_representando" else False,
+                es_conyugue=es_conyugue,
                 calidad_participacion=calidad,
                 registration_token_id=ctx.token_id,
                 estado=EstadoRepresentacion.pendiente,
@@ -650,6 +710,18 @@ def registrar_cliente(
                 status_code=400,
                 detail="Este enlace es para registrar "
                 + ("una empresa." if token_obj.tipo_esperado == TipoSujeto.empresa else "una persona natural."),
+            )
+
+        tipo_doc = token_obj.documento_tipo_esperado
+        if tipo == "persona" and tipo_doc and (payload.get("titular") or {}).get("document_type") != tipo_doc:
+            raise HTTPException(
+                status_code=400,
+                detail="Este enlace es para registrar un " + ("pasaporte." if tipo_doc == "pasaporte" else "número de cédula."),
+            )
+        if tipo == "empresa" and tipo_doc and bool((payload.get("empresa") or {}).get("es_extranjera")) != (tipo_doc == "extranjera"):
+            raise HTTPException(
+                status_code=400,
+                detail="Este enlace es para una empresa " + ("extranjera." if tipo_doc == "extranjera" else "ecuatoriana (con RUC)."),
             )
 
         _procesar(

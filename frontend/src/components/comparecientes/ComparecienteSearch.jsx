@@ -3,6 +3,28 @@ import { Search } from "lucide-react";
 import { Button, FormField } from "../shared";
 import { validarCedula } from "../../utils/validarCedula";
 
+const OPCIONES_PERSONA = [
+  ["cedula", "Cédula"],
+  ["pasaporte", "Pasaporte"],
+];
+const OPCIONES_EMPRESA = [
+  ["ruc", "RUC"],
+  ["extranjera", "Empresa extranjera"],
+];
+const ETIQUETAS = {
+  cedula: "Número de Cédula",
+  pasaporte: "Número de Pasaporte",
+  ruc: "RUC",
+  extranjera: "Identificación fiscal extranjera",
+};
+const EJEMPLOS = {
+  cedula: "Ej: 1234567890",
+  pasaporte: "Ej: PA123456",
+  ruc: "Ej: 1234567890001",
+  extranjera: "Ej: 900.123.456-7",
+};
+const LARGOS = { cedula: 10, pasaporte: 20, ruc: 13, extranjera: 30 };
+
 const ComparecienteSearch = ({
   onSearch,
   loading,
@@ -10,7 +32,8 @@ const ComparecienteSearch = ({
 }) => {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
-  const [tipoDoc, setTipoDoc] = useState("cedula"); // 'cedula' | 'pasaporte'
+  // 'cedula' | 'pasaporte' (personas) o 'ruc' | 'extranjera' (empresas)
+  const [tipoDoc, setTipoDoc] = useState(mode === "ruc" ? "ruc" : "cedula");
 
   const validate = (val) => {
     if (!val.trim()) return "Ingrese un valor para buscar";
@@ -25,6 +48,9 @@ const ComparecienteSearch = ({
         if (val.trim().length < 4)
           return "El pasaporte debe tener al menos 4 caracteres";
       }
+    } else if (tipoDoc === "extranjera") {
+      if (val.trim().length < 3)
+        return "La identificación debe tener al menos 3 caracteres";
     } else {
       if (!/^\d{13}$/.test(val))
         return "El RUC debe tener 13 dígitos numéricos";
@@ -42,55 +68,34 @@ const ComparecienteSearch = ({
       return;
     }
     setError("");
-    onSearch(value.trim(), tipoDoc);
+    onSearch(value.trim().toUpperCase(), tipoDoc);
   };
 
   return (
     <div className="space-y-2">
-      {mode === "cedula" && (
-        <div className="flex gap-2 mb-2">
-          <button
-            type="button"
-            onClick={() => {
-              setTipoDoc("cedula");
-              setError("");
-            }}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              tipoDoc === "cedula"
-                ? "bg-blue-100 text-blue-700"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            Cédula
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTipoDoc("pasaporte");
-              setError("");
-            }}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              tipoDoc === "pasaporte"
-                ? "bg-blue-100 text-blue-700"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            Pasaporte
-          </button>
-        </div>
-      )}
+      <div className="flex gap-2 mb-2">
+        {(mode === "ruc" ? OPCIONES_EMPRESA : OPCIONES_PERSONA).map(
+          ([valor, texto]) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => {
+                setTipoDoc(valor);
+                setError("");
+              }}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                tipoDoc === valor
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {texto}
+            </button>
+          ),
+        )}
+      </div>
       <form onSubmit={handleSubmit} className="flex gap-3 items-end">
-        <FormField
-          label={
-            mode === "ruc"
-              ? "RUC"
-              : tipoDoc === "cedula"
-                ? "Número de Cédula"
-                : "Número de Pasaporte"
-          }
-          error={error}
-          className="flex-1"
-        >
+        <FormField label={ETIQUETAS[tipoDoc]} error={error} className="flex-1">
           <input
             type="text"
             value={value}
@@ -99,14 +104,8 @@ const ComparecienteSearch = ({
               setError("");
             }}
             className={`input-field ${error ? "border-red-500 bg-red-50" : ""}`}
-            placeholder={
-              mode === "ruc"
-                ? "Ej: 1234567890001"
-                : tipoDoc === "cedula"
-                  ? "Ej: 1234567890"
-                  : "Ej: PA123456"
-            }
-            maxLength={mode === "ruc" ? 13 : tipoDoc === "cedula" ? 10 : 20}
+            placeholder={EJEMPLOS[tipoDoc]}
+            maxLength={LARGOS[tipoDoc]}
             disabled={loading}
           />
         </FormField>
